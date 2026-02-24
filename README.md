@@ -33,3 +33,15 @@ Response:
     "status": "Normal | Low | Out of Stock"
   }
 ]
+### GET /dashboard/summary
+
+Response:
+{
+  "totalRevenue": number,
+  "totalProfit": number,
+  "dailyRevenue": number,
+  "dailyProfit": number,
+  "totalTransactions": number,
+  "topCategory": string,
+  "lowStockCount": number
+}
