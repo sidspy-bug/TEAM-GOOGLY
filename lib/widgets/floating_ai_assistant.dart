@@ -13,7 +13,15 @@ class FloatingAiAssistant extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Camera / OCR button
+          // Main AI FAB (above camera)
+          FloatingActionButton(
+            heroTag: 'fab_ai',
+            backgroundColor: Colors.indigo,
+            onPressed: () => _showAssistantSheet(context),
+            child: const Icon(Icons.auto_awesome, color: Colors.white),
+          ),
+          const SizedBox(height: 10),
+          // Camera / OCR button (below AI)
           FloatingActionButton.small(
             heroTag: 'fab_camera',
             backgroundColor: Colors.white,
@@ -23,14 +31,6 @@ class FloatingAiAssistant extends StatelessWidget {
               );
             },
             child: Icon(Icons.camera_alt, color: Colors.indigo.shade600, size: 20),
-          ),
-          const SizedBox(height: 10),
-          // Main AI FAB
-          FloatingActionButton(
-            heroTag: 'fab_ai',
-            backgroundColor: Colors.indigo,
-            onPressed: () => _showAssistantSheet(context),
-            child: const Icon(Icons.auto_awesome, color: Colors.white),
           ),
         ],
       ),

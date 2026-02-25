@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'otp_verification_screen.dart';
+import '../services/auth_service.dart';
+import 'email_verification_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   final VoidCallback onSignupSuccess;
@@ -16,6 +17,8 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   bool _socialLoading = false;
+  bool _signupLoading = false;
+  final _auth = AuthService();
 
   @override
   void dispose() {
@@ -26,41 +29,76 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _signup() {
+  void _signup() async {
     if (_formKey.currentState?.validate() ?? false) {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (_) => OtpVerificationScreen(
-          email: _emailCtrl.text,
-          onVerified: widget.onSignupSuccess,
-        ),
-      ));
+      setState(() => _signupLoading = true);
+      try {
+        await _auth.signUpWithEmail(_emailCtrl.text, _passCtrl.text);
+        // Update display name if provided
+        if (_nameCtrl.text.trim().isNotEmpty) {
+          await _auth.currentUser?.updateDisplayName(_nameCtrl.text.trim());
+        }
+        // Send verification email and go to verification screen
+        await _auth.sendEmailVerification();
+        if (mounted) {
+          setState(() => _signupLoading = false);
+          Navigator.of(context).pushReplacement(MaterialPageRoute(
+            builder: (_) => EmailVerificationScreen(
+              email: _emailCtrl.text,
+              onVerified: widget.onSignupSuccess,
+            ),
+          ));
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _signupLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_errorMessage(e)), backgroundColor: Colors.red),
+          );
+        }
+      }
     }
   }
 
   Future<void> _signupWithGoogle() async {
     if (_socialLoading) return;
     setState(() => _socialLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (mounted) {
-      setState(() => _socialLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signed up with Google (mock)')),
-      );
-      widget.onSignupSuccess();
+    try {
+      await _auth.signInWithGoogle();
+      if (mounted) widget.onSignupSuccess();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _socialLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_errorMessage(e)), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
   Future<void> _signupWithFacebook() async {
     if (_socialLoading) return;
     setState(() => _socialLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (mounted) {
-      setState(() => _socialLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signed up with Facebook (mock)')),
-      );
-      widget.onSignupSuccess();
+    try {
+      await _auth.signInWithFacebook();
+      if (mounted) widget.onSignupSuccess();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _socialLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_errorMessage(e)), backgroundColor: Colors.red),
+        );
+      }
     }
+  }
+
+  String _errorMessage(dynamic e) {
+    final msg = e.toString();
+    if (msg.contains('email-already-in-use')) return 'This email is already registered.';
+    if (msg.contains('weak-password')) return 'Password is too weak.';
+    if (msg.contains('invalid-email')) return 'Invalid email address.';
+    if (msg.contains('popup-closed') || msg.contains('cancelled')) return 'Sign-in cancelled.';
+    return 'Sign-up failed. Please try again.';
   }
 
   @override
@@ -79,6 +117,8 @@ class _SignupScreenState extends State<SignupScreen> {
                   Icon(Icons.storefront, size: 64, color: Colors.indigo.shade400),
                   const SizedBox(height: 12),
                   const Text('Create Account', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                  const SizedBox(height: 4),
+                  Text('Powered by GrowthOS', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
                   const SizedBox(height: 4),
                   Text('Join GrowthOS', style: TextStyle(color: Colors.grey.shade600)),
                   const SizedBox(height: 32),
