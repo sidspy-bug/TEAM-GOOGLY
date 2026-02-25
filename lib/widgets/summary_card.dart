@@ -4,26 +4,31 @@ class SummaryCard extends StatelessWidget {
   final String title;
   final String value;
   final IconData icon;
+  final Color? color;
 
-  const SummaryCard({super.key, required this.title, required this.value, required this.icon});
+  const SummaryCard({super.key, required this.title, required this.value, required this.icon, this.color});
 
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: color ?? Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
-            CircleAvatar(backgroundColor: Theme.of(context).colorScheme.primary, child: Icon(icon, color: Colors.white)),
+            CircleAvatar(
+              backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+              child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 20),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                  const SizedBox(height: 6),
-                  Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(title, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                  const SizedBox(height: 4),
+                  Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),

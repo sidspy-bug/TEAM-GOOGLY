@@ -17,7 +17,7 @@ class DashboardScreenMinimal extends StatelessWidget {
                 children: [
                   Text('Total Sales', style: TextStyle(fontSize: 14)),
                   SizedBox(height: 8),
-                  Text('\$5000', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  Text('₹5000', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),

@@ -4,8 +4,9 @@ import '../models/dashboard_summary.dart';
 import '../widgets/summary_card.dart';
 import '../widgets/line_chart_card.dart';
 import '../widgets/bar_chart_card.dart';
-import '../widgets/product_list.dart';
-import '../widgets/insight_card.dart';
+import '../widgets/top_products_table.dart';
+import '../widgets/ai_insights_card.dart';
+import '../widgets/today_focus_card.dart';
 
 class DashboardScreen extends StatefulWidget {
   final SalesRepository salesRepository;
@@ -46,152 +47,187 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Business Dashboard'),
-        actions: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              child: GestureDetector(
-                onTap: _isPremium
-                    ? null
-                    : () {
-                        widget.onPremiumToggle(true);
-                      },
-                child: Tooltip(
-                  message: _isPremium ? 'Premium User' : 'Tap to Upgrade',
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _isPremium ? Icons.star : Icons.star_border,
-                        color: _isPremium ? Colors.amber : Colors.white,
-                        size: 28,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _isPremium ? 'Premium' : 'Free',
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+    return FutureBuilder<DashboardSummary>(
+      future: _summaryFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Loading...'),
+              ],
             ),
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        child: ListView(children: const [DrawerHeader(child: Text('Menu'))]),
-      ),
-      body: FutureBuilder<DashboardSummary>(
-        future: _summaryFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Loading...'),
-                ],
-              ),
-            );
-          }
+          );
+        }
 
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  const Text('Error loading dashboard'),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: () => setState(
-                        () => _summaryFuture = widget.salesRepository.getDashboardSummary()),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, size: 48, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text('Error loading dashboard'),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: () => setState(
+                      () => _summaryFuture = widget.salesRepository.getDashboardSummary()),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
 
-          if (!snapshot.hasData) {
-            return const Center(child: Text('No data'));
-          }
+        if (!snapshot.hasData) {
+          return const Center(child: Text('No data'));
+        }
 
-          final summary = snapshot.data!;
-          return _buildDashboard(summary);
-        },
-      ),
+        final summary = snapshot.data!;
+        return _buildDashboard(summary);
+      },
     );
   }
 
   Widget _buildDashboard(DashboardSummary summary) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final isWide = constraints.maxWidth > 800;
+    final topProductName = summary.topProducts.isNotEmpty ? summary.topProducts.first.productName : '-';
 
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Summary Cards
-            GridView.count(
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: isWide ? 4 : 2,
-              shrinkWrap: true,
-              childAspectRatio: 3,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              children: [
-                SummaryCard(
-                  title: 'Total Sales',
-                  value: '\$${summary.totalSales.toStringAsFixed(0)}',
-                  icon: Icons.attach_money,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final isDesktop = width >= 900;
+        final isTablet = width >= 600 && width < 900;
+        // final isMobile = width < 600;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // AI Insights (Premium) or Today's Focus (Basic) — ABOVE everything
+              if (_isPremium)
+                AiInsightsCard(
+                  isPremium: _isPremium,
+                  lowStockCount: summary.lowStockCount,
+                  topProduct: topProductName,
+                  estimatedProfit: summary.estimatedProfit,
+                  salesRepository: widget.salesRepository,
+                )
+              else
+                TodayFocusCard(
+                  lowStockCount: summary.lowStockCount,
+                  topProduct: topProductName,
+                  estimatedProfit: summary.estimatedProfit,
                 ),
-                SummaryCard(
-                  title: 'Top Category',
-                  value: summary.categorySales.keys.isNotEmpty
-                      ? summary.categorySales.keys.first
-                      : '-',
-                  icon: Icons.category,
+              const SizedBox(height: 14),
+
+              // 4 KPI Summary Cards — responsive grid
+              _buildKpiCards(summary, isDesktop, isTablet),
+              const SizedBox(height: 14),
+
+              // Charts in single row (desktop) or stacked (mobile)
+              if (isDesktop || isTablet)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: LineChartCard(
+                        salesOverTime: summary.salesOverTime,
+                        costOverTime: summary.costOverTime,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: BarChartCard(soldVsStock: summary.soldVsStock),
+                    ),
+                  ],
+                )
+              else
+                Column(
+                  children: [
+                    LineChartCard(
+                      salesOverTime: summary.salesOverTime,
+                      costOverTime: summary.costOverTime,
+                    ),
+                    const SizedBox(height: 10),
+                    BarChartCard(soldVsStock: summary.soldVsStock),
+                  ],
                 ),
-                SummaryCard(
-                  title: 'Low Stock',
-                  value: summary.lowStockCount.toString(),
-                  icon: Icons.inventory_2,
-                ),
-                SummaryCard(
-                  title: 'Trend',
-                  value: summary.salesTrendUp ? 'Up' : 'Down',
-                  icon: summary.salesTrendUp ? Icons.trending_up : Icons.trending_down,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-            // Main Trend Chart
-            LineChartCard(salesOverTime: summary.salesOverTime),
-            const SizedBox(height: 16),
+              // Top 10 Products
+              TopProductsTable(products: summary.allProducts),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-            // Category breakdown
-            BarChartCard(categorySales: summary.categorySales),
-            const SizedBox(height: 16),
+  Widget _buildKpiCards(DashboardSummary summary, bool isDesktop, bool isTablet) {
+    final cards = [
+      SummaryCard(
+        title: "Today's Sales",
+        value: '₹${summary.totalSales.toStringAsFixed(0)}',
+        icon: Icons.storefront,
+        color: Colors.blue.shade50,
+      ),
+      SummaryCard(
+        title: 'Estimated Profit',
+        value: '₹${summary.estimatedProfit.toStringAsFixed(0)}',
+        icon: Icons.trending_up,
+        color: Colors.green.shade50,
+      ),
+      SummaryCard(
+        title: 'Low Stock',
+        value: '${summary.lowStockCount}',
+        icon: Icons.warning_amber_rounded,
+        color: Colors.orange.shade50,
+      ),
+      SummaryCard(
+        title: 'Units Sold',
+        value: '${summary.unitsSold}',
+        icon: Icons.shopping_cart,
+        color: Colors.purple.shade50,
+      ),
+    ];
 
-            // Product Lists
-            ProductList(topProducts: summary.topProducts, lowProducts: summary.lowProducts),
-            const SizedBox(height: 16),
-
-            // AI Insight
-            InsightCard(isPremium: _isPremium, salesRepository: widget.salesRepository),
-          ],
-        ),
+    if (isDesktop) {
+      // 4 in a row
+      return Row(
+        children: cards
+            .expand((c) => [Expanded(child: c), const SizedBox(width: 10)])
+            .toList()
+          ..removeLast(),
       );
-    });
+    } else if (isTablet) {
+      // 2x2 grid
+      return Column(
+        children: [
+          Row(children: [
+            Expanded(child: cards[0]),
+            const SizedBox(width: 10),
+            Expanded(child: cards[1]),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: cards[2]),
+            const SizedBox(width: 10),
+            Expanded(child: cards[3]),
+          ]),
+        ],
+      );
+    } else {
+      // Stacked on mobile
+      return Column(
+        children: cards.map((c) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: c,
+        )).toList(),
+      );
+    }
   }
 }
