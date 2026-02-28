@@ -1,0 +1,73 @@
+{
+   "checksum": "16f9b975a94d2960eee2d4ec4baed988",
+   "roots": {
+      "bookmark_bar": {
+         "children": [ {
+            "date_added": "13401744618757427",
+            "date_last_used": "0",
+            "guid": "c84121e0-521b-4dc7-8308-31c35f27c475",
+            "id": "7",
+            "name": "HTML Online Editor",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://www.w3schools.com/html/html_editor.asp",
+            "visit_count": 1
+         }, {
+            "date_added": "13401959849866306",
+            "date_last_used": "0",
+            "guid": "e5b05dfe-4f71-477c-b936-637871ec2e2f",
+            "id": "8",
+            "name": "Webminal",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://webminal.org/terminal/",
+            "visit_count": 1
+         } ],
+         "date_added": "13416691572456991",
+         "date_last_used": "0",
+         "date_modified": "13401959849866306",
+         "guid": "0bc5d13f-2cba-5d74-951f-3f233fe6c908",
+         "id": "1",
+         "name": "Favorites bar",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "other": {
+         "children": [  ],
+         "date_added": "13416691572456991",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "82b081ec-3dd3-529c-8475-ab6c344590dd",
+         "id": "2",
+         "name": "Other favorites",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "synced": {
+         "children": [  ],
+         "date_added": "13416691572456991",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "4cf2e351-0e85-532b-bb37-df045d8f8d0f",
+         "id": "3",
+         "name": "Mobile favorites",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "workspaces_v2": {
+         "children": [  ],
+         "date_added": "13416691572456991",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "75aa6670-344f-549d-b742-660f029506ab",
+         "id": "5",
+         "name": "Workspaces",
+         "source": "unknown",
+         "type": "folder"
+      }
+   },
+   "sync_metadata": "CjEKDgiIgQISCArtm1OaAQAAEgAqGDhZR1FaNnUxRGJQb05ybG45TkU3eHc9PUgDoAYHEo4BCAMSiQEKHG5qZ0R1ODhlQ3J2WHA4NnBEN2ZIR2NxRnA4OD0SJGNhNDJjNGE3LTE1OTItNWFiMy04NTI2LTE2OTlmZjg0NWYxYRgAIAAoADCjt5OG/jI43bmThv4yQN25k4b+MkoceXpOQjAxY241NEE3Y1JVMHVUKy9QZ21UdFVvPVoAZQAAAADCPgJgABKOAQgFEokBChx3UkJyWkwrNlBBOWF2S2dqTlA3SlhETGNmdnM9EiRlNmI1Yzk4Ni01M2FiLTUwYjItYWQyZC1iYjBlMjdhNjM1ODkYACAAKAAwidrvnKUzOKHa75ylM0Ch2u+cpTNKHG5teDY1c1FEdnhJOFRnRWV2K0ErbnR0b1NuND1aAGUAAAAAwj4CYAASjgEIAhKJAQocWWNTVG9udkVTUHdxQ3M0TDJjclZodjY4TDk4PRIkNTY0NDU3MWItZGU4YS01YWU2LWI1ODYtMGQ4ODlmZjUzZjYwGAAgACgAMJ63k4b+Mji2uZOG/jJAtrmThv4yShxvUFZraHdCUmJWNjVLQ1dSMitJT05IV29PdTg9WgBlAAAAAMI+AmAAEq0BCAgSqAEKHDVnOGNtaSt6K3hQYlJicGErKzBvZXpVTlJzcz0SJGU1YjA1ZGZlLTRmNzEtNDc3Yy1iOTM2LTYzNzg3MWVjMmUyZhgAIAAoADCi8N+SkzM44vHfkpMzQOLx35KTM0ocRlkySTJEZ2VuV3JXNjVvTERPVk84alhHZlhVPVofIh2kNEcvSVluS2daendVMUFWWXgxRWJlaXI4MEtFPWUAAAAAwj4CYAUSrAEIBxKnAQocNklQcW80QXJFNTdwL3puVnYvZTdxZi9NYlY0PRIkYzg0MTIxZTAtNTIxYi00ZGM3LTgzMDgtMzFjMzVmMjdjNDc1GAAgACgAMNOpj6ySMziqq4+skjNAqquPrJIzShxCSW83Q0haaDFFNnZRRHNPZnlTN3ZpbXF0L2M9Wh4iHEhyYUlzTUFpUEhNL2tKOUtZSzZFb20zZFppUT1lQLgnAsI+AmAFEo4BCAESiQEKHHl4Si82ZnZrZWNyN2twNUVRekI0dFdMcGRiRT0SJGYzMGI5NTVkLWRmYWYtNTBjOS04ZTc1LTQ0YWVlMGU5MjI5MhgAIAAoADCdt5OG/jI4ormThv4yQKK5k4b+MkocYVJDV0xnaEY5YjVJbnFLSUR2dUovanZRa0ZjPVoAZQAAAADCPgJgADAAOAA=",
+   "version": 1
+}
