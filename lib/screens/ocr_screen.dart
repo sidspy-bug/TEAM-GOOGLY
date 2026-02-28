@@ -360,7 +360,7 @@ class _OcrScreenState extends State<OcrScreen> {
               Expanded(flex: 3, child: _field(p.nameCtrl, 'Product name')),
               const SizedBox(width: 8),
               Expanded(flex: 2, child: DropdownButtonFormField<String>(
-                value: p.category,
+                initialValue: p.category,
                 items: _categories.map((c) => DropdownMenuItem(value: c,
                     child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
                 onChanged: (v) => setState(() => p.category = v ?? 'General'),
@@ -404,7 +404,7 @@ class _OcrScreenState extends State<OcrScreen> {
             _field(p.nameCtrl, 'Product name', lbl: 'Product Name'),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: p.category,
+              initialValue: p.category,
               items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
               onChanged: (v) => setState(() => p.category = v ?? 'General'),
               decoration: InputDecoration(labelText: 'Category', isDense: true,
