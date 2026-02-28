@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../screens/ocr_screen.dart';
 
 /// Floating AI Assistant button + bottom sheet modal.
 /// Shows a FAB at bottom-right that opens a chat modal.
@@ -26,8 +27,8 @@ class FloatingAiAssistant extends StatelessWidget {
             heroTag: 'fab_camera',
             backgroundColor: Colors.white,
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Camera OCR / Bill Scan coming soon')),
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const OcrScreen()),
               );
             },
             child: Icon(Icons.camera_alt, color: Colors.indigo.shade600, size: 20),
@@ -210,8 +211,10 @@ class _AssistantSheetState extends State<_AssistantSheet> {
                   icon: Icon(Icons.camera_alt_outlined,
                       color: Colors.grey.shade600, size: 22),
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text('Camera OCR / Bill Scan coming soon')));
+                    Navigator.of(context).pop(); // close the sheet
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const OcrScreen()),
+                    );
                   },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),

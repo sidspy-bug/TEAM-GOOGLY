@@ -1,11 +1,26 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 /// Centralized HTTP client for all backend API calls.
 /// Automatically attaches the Firebase ID token as a Bearer header.
+/// Detects Codespace environment and adjusts the API URL accordingly.
 class ApiService {
-  static const String baseUrl = 'http://localhost:3000';
+  static String get baseUrl {
+    if (kIsWeb) {
+      // In a browser, derive backend URL from the page's own URL.
+      // Codespace ports follow: *-PORT.app.github.dev
+      final pageUrl = Uri.base;
+      final host = pageUrl.host; // e.g. name-8080.app.github.dev
+      if (host.contains('.app.github.dev')) {
+        // Replace the port portion in the Codespace hostname
+        final backendHost = host.replaceFirst(RegExp(r'-\d+\.'), '-3000.');
+        return '${pageUrl.scheme}://$backendHost';
+      }
+    }
+    return 'http://localhost:3000';
+  }
 
   static ApiService? _instance;
   factory ApiService() => _instance ??= ApiService._();
