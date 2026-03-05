@@ -114,7 +114,11 @@ class _OcrScreenState extends State<OcrScreen> {
         _isProcessing = false;
       });
     } catch (e) {
-      setState(() { _error = 'OCR processing failed: $e'; _isProcessing = false; });
+      final message = e is ApiException ? e.message : e.toString();
+      setState(() {
+        _error = 'OCR processing failed: $message';
+        _isProcessing = false;
+      });
     }
   }
 

@@ -8,18 +8,36 @@ import 'package:http/http.dart' as http;
 /// Detects Codespace environment and adjusts the API URL accordingly.
 class ApiService {
   static String get baseUrl {
+    return _candidateBaseUrls.first;
+  }
+
+  static List<String> get _candidateBaseUrls {
+    final urls = <String>{};
+
     if (kIsWeb) {
-      // In a browser, derive backend URL from the page's own URL.
-      // Codespace ports follow: *-PORT.app.github.dev
       final pageUrl = Uri.base;
-      final host = pageUrl.host; // e.g. name-8080.app.github.dev
+      final host = pageUrl.host;
+
       if (host.contains('.app.github.dev')) {
-        // Replace the port portion in the Codespace hostname
         final backendHost = host.replaceFirst(RegExp(r'-\d+\.'), '-3000.');
-        return '${pageUrl.scheme}://$backendHost';
+        urls.add('${pageUrl.scheme}://$backendHost');
       }
+
+      if (pageUrl.hasPort) {
+        urls.add('${pageUrl.scheme}://${pageUrl.host}:3000');
+      }
+
+      if (host == 'localhost' || host == '127.0.0.1') {
+        urls.add('http://$host:3000');
+      }
+
+      urls.add('http://localhost:3000');
+      urls.add('http://127.0.0.1:3000');
+
+      return urls.toList();
     }
-    return 'http://localhost:3000';
+
+    return const ['http://localhost:3000'];
   }
 
   static ApiService? _instance;
@@ -48,46 +66,67 @@ class ApiService {
 
   /// Perform a GET request. Returns decoded JSON or throws.
   Future<dynamic> get(String path) async {
-    try {
-      final headers = await _headers();
-      final response = await http.get(
-        Uri.parse('$baseUrl$path'),
-        headers: headers,
-      );
-      return _handleResponse(response);
-    } catch (e) {
-      throw _mapNetworkError(e);
+    final headers = await _headers();
+    Object? lastError;
+
+    for (final url in _candidateBaseUrls) {
+      try {
+        final response = await http.get(Uri.parse('$url$path'), headers: headers);
+        return _handleResponse(response);
+      } on ApiException {
+        rethrow;
+      } catch (e) {
+        lastError = e;
+      }
     }
+
+    throw _mapNetworkError(lastError ?? 'Unknown network error');
   }
 
   /// Perform a POST request. Returns decoded JSON or throws.
   Future<dynamic> post(String path, {Map<String, dynamic>? body}) async {
-    try {
-      final headers = await _headers();
-      final response = await http.post(
-        Uri.parse('$baseUrl$path'),
-        headers: headers,
-        body: body != null ? jsonEncode(body) : null,
-      );
-      return _handleResponse(response);
-    } catch (e) {
-      throw _mapNetworkError(e);
+    final headers = await _headers();
+    Object? lastError;
+
+    for (final url in _candidateBaseUrls) {
+      try {
+        final response = await http.post(
+          Uri.parse('$url$path'),
+          headers: headers,
+          body: body != null ? jsonEncode(body) : null,
+        );
+        return _handleResponse(response);
+      } on ApiException {
+        rethrow;
+      } catch (e) {
+        lastError = e;
+      }
     }
+
+    throw _mapNetworkError(lastError ?? 'Unknown network error');
   }
 
   /// Perform a PUT request. Returns decoded JSON or throws.
   Future<dynamic> put(String path, {Map<String, dynamic>? body}) async {
-    try {
-      final headers = await _headers();
-      final response = await http.put(
-        Uri.parse('$baseUrl$path'),
-        headers: headers,
-        body: body != null ? jsonEncode(body) : null,
-      );
-      return _handleResponse(response);
-    } catch (e) {
-      throw _mapNetworkError(e);
+    final headers = await _headers();
+    Object? lastError;
+
+    for (final url in _candidateBaseUrls) {
+      try {
+        final response = await http.put(
+          Uri.parse('$url$path'),
+          headers: headers,
+          body: body != null ? jsonEncode(body) : null,
+        );
+        return _handleResponse(response);
+      } on ApiException {
+        rethrow;
+      } catch (e) {
+        lastError = e;
+      }
     }
+
+    throw _mapNetworkError(lastError ?? 'Unknown network error');
   }
 
   /// Handle the HTTP response: parse JSON, handle 401.
