@@ -54,6 +54,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         }
         var sales = snapshot.data ?? [];
 
+        // Keep only real sale transactions.
+        sales = sales.where((s) => s.quantity > 0).toList();
+
         // Sort by date descending
         sales.sort((a, b) => b.date.compareTo(a.date));
 

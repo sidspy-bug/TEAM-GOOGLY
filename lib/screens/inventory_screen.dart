@@ -21,11 +21,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   void _loadProducts() {
     _productsFuture = widget.salesRepository.getSales().then((sales) {
+      String keyOf(String name) => name.trim().toLowerCase();
       final Map<String, Sale> agg = {};
       for (final s in sales) {
-        if (agg.containsKey(s.productName)) {
-          final prev = agg[s.productName]!;
-          agg[s.productName] = Sale(
+        final key = keyOf(s.productName);
+        if (agg.containsKey(key)) {
+          final prev = agg[key]!;
+          agg[key] = Sale(
             productId: s.productId,
             productName: s.productName,
             category: s.category,
@@ -37,7 +39,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             transactionMode: s.transactionMode,
           );
         } else {
-          agg[s.productName] = s;
+          agg[key] = s;
         }
       }
       return agg.values.toList()..sort((a, b) => a.productId.compareTo(b.productId));

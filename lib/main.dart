@@ -69,6 +69,16 @@ class _MyAppState extends State<MyApp> {
     if (mounted) setState(() => _isLoggedIn = false);
   }
 
+  /// Called by LoginScreen after Firebase sign-in succeeds.
+  /// Loads user settings before transitioning so shop data is available.
+  Future<void> _handleLoginSuccess() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await ShopConfig.instance.loadForUser(user.uid);
+    }
+    if (mounted) setState(() => _isLoggedIn = true);
+  }
+
   /// Returns true if the user signed in with email/password only.
   bool _isEmailPasswordProvider(User user) {
     return user.providerData.every((info) => info.providerId == 'password');
@@ -101,7 +111,7 @@ class _MyAppState extends State<MyApp> {
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : _isLoggedIn
               ? _buildAuthedHome()
-              : LoginScreen(onLoginSuccess: () => setState(() => _isLoggedIn = true)),
+              : LoginScreen(onLoginSuccess: _handleLoginSuccess),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
+import '../repositories/api_sales_repository.dart';
 
 /// Editable product row parsed from OCR.
 class ParsedProduct {
@@ -37,7 +38,8 @@ class ParsedProduct {
 
 /// OCR Screen — scan an image, extract & parse products, save to inventory.
 class OcrScreen extends StatefulWidget {
-  const OcrScreen({super.key});
+  final String mode; // 'purchase' or 'sale'
+  const OcrScreen({super.key, this.mode = 'purchase'});
   @override
   State<OcrScreen> createState() => _OcrScreenState();
 }
@@ -103,8 +105,10 @@ class _OcrScreenState extends State<OcrScreen> {
         _extractedDate = result['extractedDate'] ?? '';
         _products = parsed.map((item) => ParsedProduct(
           name: item['productName'] ?? '',
-          costPrice: (item['costPrice'] ?? 0).toDouble(),
-          sellingPrice: (item['sellingPrice'] ?? 0).toDouble(),
+          costPrice: _toDouble(item['costPrice']),
+          // In sale mode, OCR responses often provide unit price as costPrice
+          // and line total separately; derive SP so rows are editable without zeros.
+          sellingPrice: _derivedSellingPrice(item),
           quantity: (item['quantity'] ?? 1).toInt(),
         )).toList();
         _isProcessing = false;
@@ -120,41 +124,138 @@ class _OcrScreenState extends State<OcrScreen> {
     if (selected.isEmpty) {
       _snack('No products selected to save'); return;
     }
+
+    final isPurchaseMode = widget.mode == 'purchase';
+    final isSaleMode = widget.mode == 'sale';
+
     for (final p in selected) {
       if (p.nameCtrl.text.trim().isEmpty) { _snack('Product name cannot be empty'); return; }
-      final cp = double.tryParse(p.costPriceCtrl.text);
-      if (cp == null || cp <= 0) { _snack('Invalid cost price for "${p.nameCtrl.text}"'); return; }
-      final sp = double.tryParse(p.sellingPriceCtrl.text);
-      if (sp == null || sp <= 0) { _snack('Enter selling price for "${p.nameCtrl.text}"'); return; }
+
+      final qty = int.tryParse(p.quantityCtrl.text) ?? 0;
+      if (qty <= 0) { _snack('Invalid quantity for "${p.nameCtrl.text}"'); return; }
+
+      if (isPurchaseMode) {
+        final cp = double.tryParse(p.costPriceCtrl.text);
+        if (cp == null || cp <= 0) { _snack('Invalid cost price for "${p.nameCtrl.text}"'); return; }
+      }
+
+      if (isSaleMode) {
+        final sp = double.tryParse(p.sellingPriceCtrl.text);
+        if (sp == null || sp <= 0) { _snack('Enter selling price for "${p.nameCtrl.text}"'); return; }
+      }
     }
 
     setState(() { _isSaving = true; _error = null; _successMsg = null; });
     int saved = 0;
     final List<String> errs = [];
 
+    List<dynamic> existingProducts = [];
+    try {
+      final data = await ApiService().get('/products/list');
+      existingProducts = data is List ? data : [];
+    } catch (e) {
+      setState(() { _isSaving = false; _error = 'Failed to load products: $e'; });
+      return;
+    }
+
+    String normalized(String v) => v.trim().toLowerCase();
+    final Map<String, Map<String, dynamic>> productByName = {};
+    for (final row in existingProducts) {
+      if (row is! Map<String, dynamic>) continue;
+      final key = normalized((row['productName'] ?? '').toString());
+      if (key.isEmpty) continue;
+      productByName[key] = row;
+    }
+
     for (final p in selected) {
       try {
-        final res = await ApiService().post('/products/add', body: {
-          'product_name': p.nameCtrl.text.trim(),
-          'category': p.category,
-          'cost_price': double.parse(p.costPriceCtrl.text),
-          'selling_price': double.parse(p.sellingPriceCtrl.text),
-        });
-        final pid = res['product']?['id'];
-        if (pid == null) { errs.add('${p.nameCtrl.text}: no product ID'); continue; }
-        await ApiService().post('/inventory/add', body: {
-          'product_id': pid, 'stock': int.tryParse(p.quantityCtrl.text) ?? 1,
-        });
-        saved++;
+        final name = p.nameCtrl.text.trim();
+        final qty = int.tryParse(p.quantityCtrl.text) ?? 1;
+        final existing = productByName[normalized(name)];
+
+        if (isPurchaseMode) {
+          final cp = double.parse(p.costPriceCtrl.text);
+          dynamic productId;
+
+          if (existing != null && existing['id'] != null) {
+            productId = existing['id'];
+            final existingSp = _toDouble(existing['sellingPrice']);
+            final safeSp = existingSp > 0 ? existingSp : cp;
+            await ApiService().put('/products/update/$productId', body: {
+              'productName': name,
+              'category': p.category,
+              'costPrice': cp,
+              'sellingPrice': safeSp,
+            });
+          } else {
+            final created = await ApiService().post('/products/add', body: {
+              'productName': name,
+              'category': p.category,
+              'costPrice': cp,
+              // CP-first flow: SP can be updated later during sale OCR.
+              'sellingPrice': cp,
+            });
+            productId = created['id'];
+          }
+
+          if (productId == null) { errs.add('$name: no product ID'); continue; }
+          await ApiService().post('/inventory/add', body: {
+            'productId': productId,
+            'stockAdded': qty,
+          });
+          saved++;
+        } else if (isSaleMode) {
+          if (existing == null || existing['id'] == null) {
+            errs.add('$name: product not found. Add it via purchase first.');
+            continue;
+          }
+          final productId = existing['id'];
+          final sp = double.parse(p.sellingPriceCtrl.text);
+
+          await ApiService().put('/products/update/$productId', body: {
+            'sellingPrice': sp,
+          });
+
+          await ApiService().post('/transactions/sell', body: {
+            'productId': productId,
+            'unitsSold': qty,
+            'transactionMode': 'OCR',
+          });
+          saved++;
+        }
       } catch (e) { errs.add('${p.nameCtrl.text}: $e'); }
     }
     setState(() {
       _isSaving = false;
+      // Clear the API cache so dashboard/inventory/sales screens show fresh data
+      ApiSalesRepository().clearCache();
       _successMsg = errs.isEmpty
-          ? 'Saved $saved product(s) to inventory!'
+          ? (isPurchaseMode
+              ? 'Saved $saved product(s) to inventory!'
+              : 'Saved $saved sale transaction(s)!')
           : 'Saved $saved. ${errs.length} failed.';
       if (errs.isNotEmpty) _error = errs.join('\n');
     });
+  }
+
+  double _toDouble(dynamic v) {
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0;
+    return 0;
+  }
+
+  double _derivedSellingPrice(dynamic item) {
+    if (item is! Map<String, dynamic>) return 0;
+    final parsedSp = _toDouble(item['sellingPrice']);
+    final qty = (item['quantity'] ?? 1).toInt();
+    final total = _toDouble(item['totalPrice']);
+    final unitPrice = _toDouble(item['costPrice']);
+
+    if (widget.mode != 'sale') return parsedSp;
+    if (parsedSp > 0) return parsedSp;
+    if (total > 0 && qty > 0) return total / qty;
+    return unitPrice;
   }
 
   void _snack(String msg) =>
@@ -335,18 +436,19 @@ class _OcrScreenState extends State<OcrScreen> {
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     child: Padding(padding: const EdgeInsets.all(12), child: Column(
       crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Padding(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8), child: Row(children: [
-          SizedBox(width: 36),
-          Expanded(flex: 3, child: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-          SizedBox(width: 8),
-          Expanded(flex: 2, child: Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-          SizedBox(width: 8),
-          SizedBox(width: 90, child: Text('Cost Price', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-          SizedBox(width: 8),
-          SizedBox(width: 100, child: Text('Selling Price', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-          SizedBox(width: 8),
-          SizedBox(width: 70, child: Text('Stock', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-          SizedBox(width: 36),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), child: Row(children: [
+          const SizedBox(width: 36),
+          const Expanded(flex: 3, child: Text('Product Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+          const SizedBox(width: 8),
+          const Expanded(flex: 2, child: Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+          const SizedBox(width: 8),
+          if (widget.mode == 'purchase')
+            const SizedBox(width: 100, child: Text('Cost Price', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)))
+          else
+            const SizedBox(width: 100, child: Text('Selling Price', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+          const SizedBox(width: 8),
+          SizedBox(width: 90, child: Text(widget.mode == 'purchase' ? 'Stock In' : 'Units Sold', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+          const SizedBox(width: 36),
         ])),
         const Divider(height: 1),
         ...List.generate(_products.length, (i) {
@@ -369,11 +471,12 @@ class _OcrScreenState extends State<OcrScreen> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(6))),
               )),
               const SizedBox(width: 8),
-              SizedBox(width: 90, child: _field(p.costPriceCtrl, '0.00', num: true, pre: '\$ ')),
+              if (widget.mode == 'purchase')
+                SizedBox(width: 100, child: _field(p.costPriceCtrl, '0.00', num: true, pre: '₹ '))
+              else
+                SizedBox(width: 100, child: _field(p.sellingPriceCtrl, '0.00', num: true, pre: '₹ ')),
               const SizedBox(width: 8),
-              SizedBox(width: 100, child: _field(p.sellingPriceCtrl, '0.00', num: true, pre: '\$ ')),
-              const SizedBox(width: 8),
-              SizedBox(width: 70, child: _field(p.quantityCtrl, '1', num: true)),
+              SizedBox(width: 90, child: _field(p.quantityCtrl, '1', num: true)),
               SizedBox(width: 36, child: IconButton(icon: Icon(Icons.delete_outline,
                   color: Colors.red.shade400, size: 18), onPressed: () => _removeRow(i), splashRadius: 16)),
             ]),
@@ -412,13 +515,18 @@ class _OcrScreenState extends State<OcrScreen> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
             ),
             const SizedBox(height: 8),
-            Row(children: [
-              Expanded(child: _field(p.costPriceCtrl, '0.00', lbl: 'Cost Price (CP)', num: true, pre: '\$ ')),
-              const SizedBox(width: 8),
-              Expanded(child: _field(p.sellingPriceCtrl, '0.00', lbl: 'Selling Price (SP)', num: true, pre: '\$ ')),
-            ]),
-            const SizedBox(height: 8),
-            SizedBox(width: 120, child: _field(p.quantityCtrl, '1', lbl: 'Stock Qty', num: true)),
+            if (widget.mode == 'purchase')
+              Row(children: [
+                Expanded(child: _field(p.costPriceCtrl, '0.00', lbl: 'Cost Price (CP)', num: true, pre: '₹ ')),
+                const SizedBox(width: 8),
+                Expanded(child: _field(p.quantityCtrl, '1', lbl: 'Stock Qty', num: true)),
+              ])
+            else if (widget.mode == 'sale')
+              Row(children: [
+                Expanded(child: _field(p.sellingPriceCtrl, '0.00', lbl: 'Selling Price (SP)', num: true, pre: '₹ ')),
+                const SizedBox(width: 8),
+                Expanded(child: _field(p.quantityCtrl, '1', lbl: 'Units Sold', num: true)),
+              ]),
           ],
         )),
       );
@@ -446,7 +554,11 @@ class _OcrScreenState extends State<OcrScreen> {
             ? const SizedBox(width: 18, height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.save),
-        label: Text(_isSaving ? 'Saving…' : 'Save $n Product(s) to Inventory'),
+          label: Text(_isSaving
+            ? 'Saving…'
+            : (widget.mode == 'purchase'
+              ? 'Save $n Product(s) to Inventory'
+              : 'Save $n Sale Transaction(s)')),
         style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),

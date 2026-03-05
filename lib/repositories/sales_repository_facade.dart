@@ -1,6 +1,7 @@
 import '../models/sale.dart';
 import '../models/dashboard_summary.dart';
 import 'sales_repository.dart';
+import 'api_sales_repository.dart';
 
 /// Facade that tries the primary (API) repository first,
 /// and falls back to the fallback (dummy) repository on error or empty data.
@@ -9,6 +10,13 @@ class SalesRepositoryFacade implements SalesRepository {
   final SalesRepository fallback;
 
   SalesRepositoryFacade(this.primary, this.fallback);
+
+  /// Clear cached data so next fetch hits the API again.
+  void clearCache() {
+    if (primary is ApiSalesRepository) {
+      (primary as ApiSalesRepository).clearCache();
+    }
+  }
 
   @override
   Future<List<Sale>> getSales() async {

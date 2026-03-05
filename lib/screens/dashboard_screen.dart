@@ -167,36 +167,96 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _showCardDetails(int index, DashboardSummary summary) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        switch (index) {
+          case 0:
+            return SizedBox(height: 350, child: LineChartCard(salesOverTime: summary.salesOverTime, costOverTime: summary.costOverTime));
+          case 1:
+            return SizedBox(height: 350, child: LineChartCard(salesOverTime: summary.salesOverTime, costOverTime: summary.costOverTime));
+          case 2:
+            final lowStock = summary.allProducts.where((p) => p.currentStock < 10).toList();
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Low Stock Products', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: lowStock.length,
+                    itemBuilder: (ctx, i) => ListTile(
+                      leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                      title: Text(lowStock[i].productName),
+                      subtitle: Text('Stock: ${lowStock[i].currentStock}'),
+                    ),
+                  ),
+                ),
+              ]),
+            );
+          case 3:
+            final sorted = List.of(summary.allProducts)..sort((a, b) => b.quantity.compareTo(a.quantity));
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Most Sold Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: sorted.length,
+                    itemBuilder: (ctx, i) => ListTile(
+                      leading: const Icon(Icons.shopping_cart, color: Colors.purple),
+                      title: Text(sorted[i].productName),
+                      trailing: Text('Sold: ${sorted[i].quantity}'),
+                    ),
+                  ),
+                ),
+              ]),
+            );
+          default:
+            return const SizedBox.shrink();
+        }
+      },
+    );
+  }
+
   Widget _buildKpiCards(DashboardSummary summary, bool isDesktop, bool isTablet) {
     final cards = [
       SummaryCard(
-        title: "Today's Sales",
+        title: 'Total Sales',
         value: '₹${summary.totalSales.toStringAsFixed(0)}',
         icon: Icons.storefront,
         color: Colors.blue.shade50,
+        onTap: () => _showCardDetails(0, summary),
       ),
       SummaryCard(
         title: 'Estimated Profit',
         value: '₹${summary.estimatedProfit.toStringAsFixed(0)}',
         icon: Icons.trending_up,
         color: Colors.green.shade50,
+        onTap: () => _showCardDetails(1, summary),
       ),
       SummaryCard(
         title: 'Low Stock',
         value: '${summary.lowStockCount}',
         icon: Icons.warning_amber_rounded,
         color: Colors.orange.shade50,
+        onTap: () => _showCardDetails(2, summary),
       ),
       SummaryCard(
         title: 'Units Sold',
         value: '${summary.unitsSold}',
         icon: Icons.shopping_cart,
         color: Colors.purple.shade50,
+        onTap: () => _showCardDetails(3, summary),
       ),
     ];
 
     if (isDesktop) {
-      // 4 in a row
       return Row(
         children: cards
             .expand((c) => [Expanded(child: c), const SizedBox(width: 10)])
@@ -204,7 +264,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ..removeLast(),
       );
     } else if (isTablet) {
-      // 2x2 grid
       return Column(
         children: [
           Row(children: [
@@ -221,7 +280,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       );
     } else {
-      // Stacked on mobile
       return Column(
         children: cards.map((c) => Padding(
           padding: const EdgeInsets.only(bottom: 8),

@@ -106,9 +106,6 @@ app.post("/products/add", verifyToken, (req, res) => {
     if (costPrice <= 0 || sellingPrice <= 0) {
       return res.status(400).json({ error: "Prices must be > 0" });
     }
-    if (sellingPrice <= costPrice) {
-      return res.status(400).json({ error: "Selling price must be greater than cost price" });
-    }
 
     const result = db.prepare(
       "INSERT INTO products (user_id, product_name, category, cost_price, selling_price) VALUES (?, ?, ?, ?, ?)"
@@ -141,10 +138,6 @@ app.get("/products/category/:category", verifyToken, (req, res) => {
 app.put("/products/update/:id", verifyToken, (req, res) => {
   try {
     const { productName, category, costPrice, sellingPrice } = req.body;
-
-    if (sellingPrice !== undefined && costPrice !== undefined && sellingPrice <= costPrice) {
-      return res.status(400).json({ error: "Selling price must be greater than cost price" });
-    }
 
     const updates = [];
     const params = [];
@@ -288,6 +281,39 @@ app.get("/transactions/history", verifyToken, (req, res) => {
   `).all(req.user.uid);
 
   res.json(rows);
+});
+
+// 📊 Dashboard Summary (used by Flutter getDashboardSummary)
+app.get("/dashboard/summary", verifyToken, (req, res) => {
+  const uid = req.user.uid;
+
+  const today = db.prepare(`
+    SELECT COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(profit), 0) AS profit, COUNT(*) AS count
+    FROM transactions WHERE user_id = ? AND date(transaction_date) = date('now')
+  `).get(uid);
+
+  const total = db.prepare(`
+    SELECT COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(profit), 0) AS profit,
+           COALESCE(SUM(units_sold), 0) AS unitsSold, COUNT(*) AS count
+    FROM transactions WHERE user_id = ?
+  `).get(uid);
+
+  const lowStockCount = db.prepare(
+    "SELECT COUNT(*) AS count FROM inventory WHERE user_id = ? AND current_stock < ?"
+  ).get(uid, LOW_STOCK_THRESHOLD);
+
+  const productCount = db.prepare("SELECT COUNT(*) AS count FROM products WHERE user_id = ?").get(uid);
+
+  res.json({
+    totalRevenue: total.revenue,
+    totalProfit: total.profit,
+    totalTransactions: total.count,
+    unitsSold: total.unitsSold,
+    dailyRevenue: today.revenue,
+    dailyProfit: today.profit,
+    lowStockCount: lowStockCount.count,
+    totalProducts: productCount.count,
+  });
 });
 
 /* =====================

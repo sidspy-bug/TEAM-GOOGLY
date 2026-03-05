@@ -48,34 +48,46 @@ class ApiService {
 
   /// Perform a GET request. Returns decoded JSON or throws.
   Future<dynamic> get(String path) async {
-    final headers = await _headers();
-    final response = await http.get(
-      Uri.parse('$baseUrl$path'),
-      headers: headers,
-    );
-    return _handleResponse(response);
+    try {
+      final headers = await _headers();
+      final response = await http.get(
+        Uri.parse('$baseUrl$path'),
+        headers: headers,
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw _mapNetworkError(e);
+    }
   }
 
   /// Perform a POST request. Returns decoded JSON or throws.
   Future<dynamic> post(String path, {Map<String, dynamic>? body}) async {
-    final headers = await _headers();
-    final response = await http.post(
-      Uri.parse('$baseUrl$path'),
-      headers: headers,
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return _handleResponse(response);
+    try {
+      final headers = await _headers();
+      final response = await http.post(
+        Uri.parse('$baseUrl$path'),
+        headers: headers,
+        body: body != null ? jsonEncode(body) : null,
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw _mapNetworkError(e);
+    }
   }
 
   /// Perform a PUT request. Returns decoded JSON or throws.
   Future<dynamic> put(String path, {Map<String, dynamic>? body}) async {
-    final headers = await _headers();
-    final response = await http.put(
-      Uri.parse('$baseUrl$path'),
-      headers: headers,
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return _handleResponse(response);
+    try {
+      final headers = await _headers();
+      final response = await http.put(
+        Uri.parse('$baseUrl$path'),
+        headers: headers,
+        body: body != null ? jsonEncode(body) : null,
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw _mapNetworkError(e);
+    }
   }
 
   /// Handle the HTTP response: parse JSON, handle 401.
@@ -94,6 +106,21 @@ class ApiService {
     }
     if (response.body.isEmpty) return {};
     return jsonDecode(response.body);
+  }
+
+  Exception _mapNetworkError(Object error) {
+    final msg = error.toString();
+    final isCodespacesHost = baseUrl.contains('.app.github.dev');
+    final failedFetch = msg.contains('Failed to fetch') || msg.contains('ClientException');
+
+    if (isCodespacesHost && failedFetch) {
+      return ApiException(
+        'Cannot reach backend. In Codespaces, make sure port 3000 is running and set to Public in the Ports panel.',
+        0,
+      );
+    }
+
+    return ApiException('Network error: $msg', 0);
   }
 }
 

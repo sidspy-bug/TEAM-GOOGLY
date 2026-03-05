@@ -4,8 +4,12 @@ import '../services/api_service.dart';
 import 'sales_repository.dart';
 
 /// SalesRepository implementation backed by the backend REST API.
-/// Falls back to DummySalesRepository data if the API is unreachable.
+/// Singleton so cache is shared across the app.
 class ApiSalesRepository implements SalesRepository {
+  static final ApiSalesRepository _instance = ApiSalesRepository._internal();
+  factory ApiSalesRepository() => _instance;
+  ApiSalesRepository._internal();
+
   final ApiService _api = ApiService();
 
   // Cached data per page load
@@ -23,14 +27,23 @@ class ApiSalesRepository implements SalesRepository {
     if (_cachedSales != null) return _cachedSales!;
 
     try {
-      // Fetch products and inventory in parallel
+      // Fetch products, inventory and transaction history in parallel.
       final results = await Future.wait([
         _api.get('/products/list'),
         _api.get('/inventory/status'),
+        _api.get('/transactions/history'),
       ]);
 
       final List<dynamic> productsJson = results[0] is List ? results[0] : [];
       final List<dynamic> inventoryJson = results[1] is List ? results[1] : [];
+      final List<dynamic> transactionsJson = results[2] is List ? results[2] : [];
+
+      final Map<String, Map<String, dynamic>> productMap = {};
+      for (final p in productsJson) {
+        if (p is Map<String, dynamic> && p['id'] != null) {
+          productMap[p['id'].toString()] = p;
+        }
+      }
 
       // Build inventory lookup by productId
       final Map<String, Map<String, dynamic>> inventoryMap = {};
@@ -41,28 +54,65 @@ class ApiSalesRepository implements SalesRepository {
       }
 
       final List<Sale> sales = [];
+
+      final Set<String> txProductIds = {};
+      for (final t in transactionsJson) {
+        if (t is! Map<String, dynamic>) continue;
+        final id = (t['productId'] ?? '').toString();
+        if (id.isEmpty) continue;
+        txProductIds.add(id);
+
+        final product = productMap[id];
+        final inv = inventoryMap[id];
+        final units = _toInt(t['unitsSold']);
+        final revenue = _toDouble(t['revenue']);
+        final profit = _toDouble(t['profit']);
+        final sellingPrice = units > 0
+          ? (revenue / units).toDouble()
+            : _toDouble(product?['sellingPrice']);
+        final derivedCost = units > 0 ? ((revenue - profit) / units).toDouble() : 0.0;
+        final costPrice = _toDouble(product?['costPrice']) > 0
+            ? _toDouble(product?['costPrice'])
+            : derivedCost;
+
+        final rawStock = inv?['currentStock'] ?? 0;
+        final stock = (rawStock is int ? rawStock : (rawStock as num).toInt());
+        final clampedStock = stock < 0 ? 0 : stock;
+
+        sales.add(Sale(
+          productId: id,
+          productName: (t['productName'] ?? product?['productName'] ?? 'Unknown').toString(),
+          category: (t['category'] ?? product?['category'] ?? 'General').toString(),
+          quantity: units,
+          price: sellingPrice,
+          costPrice: costPrice,
+          currentStock: clampedStock,
+          date: _parseDate(t['transactionDate']),
+          transactionMode: (t['transactionMode'] ?? 'OCR').toString(),
+        ));
+      }
+
+      // Also include products with no sales yet so inventory remains complete.
       for (final p in productsJson) {
         if (p is! Map<String, dynamic>) continue;
-        final id = (p['id'] ?? p['productId'] ?? '').toString();
+        final id = (p['id'] ?? '').toString();
+        if (id.isEmpty || txProductIds.contains(id)) continue;
+
         final inv = inventoryMap[id];
         final rawStock = inv?['currentStock'] ?? 0;
         final stock = (rawStock is int ? rawStock : (rawStock as num).toInt());
         final clampedStock = stock < 0 ? 0 : stock;
-        final invStatus = inv?['status'] ?? 'Normal';
-
-        final sellingPrice = _toDouble(p['sellingPrice'] ?? p['price'] ?? 0);
-        final costPrice = _toDouble(p['costPrice'] ?? 0);
 
         sales.add(Sale(
           productId: id,
-          productName: (p['productName'] ?? p['name'] ?? 'Unknown').toString(),
-          category: (p['category'] ?? '').toString(),
-          quantity: clampedStock, // use stock as quantity proxy when no transactions
-          price: sellingPrice,
-          costPrice: costPrice,
+          productName: (p['productName'] ?? 'Unknown').toString(),
+          category: (p['category'] ?? 'General').toString(),
+          quantity: 0,
+          price: _toDouble(p['sellingPrice']),
+          costPrice: _toDouble(p['costPrice']),
           currentStock: clampedStock,
           date: _parseDate(p['createdAt']),
-          transactionMode: invStatus == 'Low' ? 'Low Stock' : 'Normal',
+          transactionMode: 'No Sales Yet',
         ));
       }
 
@@ -103,7 +153,28 @@ class ApiSalesRepository implements SalesRepository {
       final Map<String, Map<String, int>> soldVsStock = {};
       int computedLowStock = 0;
 
+      final Map<String, Sale> perProduct = {};
       for (final s in sales) {
+        final key = s.productId;
+        if (!perProduct.containsKey(key)) {
+          perProduct[key] = s;
+        } else {
+          final prev = perProduct[key]!;
+          perProduct[key] = Sale(
+            productId: s.productId,
+            productName: s.productName,
+            category: s.category,
+            quantity: prev.quantity + s.quantity,
+            price: s.quantity > 0 ? s.price : prev.price,
+            costPrice: s.costPrice > 0 ? s.costPrice : prev.costPrice,
+            currentStock: s.currentStock,
+            date: s.date.isAfter(prev.date) ? s.date : prev.date,
+            transactionMode: s.transactionMode,
+          );
+        }
+      }
+
+      for (final s in perProduct.values) {
         categorySales[s.category] = (categorySales[s.category] ?? 0) + s.dailyRevenue;
         soldVsStock[s.productName] = {
           'sold': s.quantity,
@@ -113,9 +184,10 @@ class ApiSalesRepository implements SalesRepository {
       }
 
       // Sort by quantity for top/low products
-      final sorted = List<Sale>.from(sales)..sort((a, b) => b.quantity.compareTo(a.quantity));
+      final sorted = List<Sale>.from(perProduct.values)..sort((a, b) => b.quantity.compareTo(a.quantity));
       final topProducts = sorted.take(3).toList();
-      final lowProducts = sorted.reversed.take(3).toList();
+      final lowProducts = List<Sale>.from(perProduct.values)
+        ..sort((a, b) => a.currentStock.compareTo(b.currentStock));
 
       // Build salesOverTime and costOverTime from analytics
       // Use daily data as single-day point; for multi-day, the API would need expansion
@@ -131,7 +203,7 @@ class ApiSalesRepository implements SalesRepository {
         unitsSold: unitsSold > 0 ? unitsSold : sales.fold(0, (sum, s) => sum + s.quantity),
         categorySales: categorySales,
         topProducts: topProducts,
-        lowProducts: lowProducts,
+        lowProducts: lowProducts.take(3).toList(),
         allProducts: sorted,
         lowStockCount: lowStockCount > 0 ? lowStockCount : computedLowStock,
         salesTrendUp: dailyProfit >= 0,
