@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'email_verification_screen.dart';
@@ -112,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
               _phoneLoading = false;
             });
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('OTP sent to your phone')),
+              SnackBar(content: Text(AppLocalizations.of(context).otpSent)),
             );
           }
         },
@@ -133,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _verifyOtp() async {
     if (_verificationId == null || _otpCtrl.text.trim().length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid 6-digit OTP'), backgroundColor: Colors.red),
+        SnackBar(content: Text(AppLocalizations.of(context).invalidOtp), backgroundColor: Colors.red),
       );
       return;
     }
@@ -167,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await _auth.signInWithGoogle();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Signed in with Google successfully!')),
+          SnackBar(content: Text(AppLocalizations.of(context).signedInWithGoogle)),
         );
         widget.onLoginSuccess();
       }
@@ -188,7 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await _auth.signInWithFacebook();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Signed in with Facebook successfully!')),
+          SnackBar(content: Text(AppLocalizations.of(context).signedInWithFacebook)),
         );
         widget.onLoginSuccess();
       }
@@ -217,6 +218,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -228,20 +230,20 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 Icon(Icons.storefront, size: 64, color: Colors.indigo.shade400),
                 const SizedBox(height: 12),
-                const Text('GrowthOS', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                Text(l.appName, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.indigo)),
                 const SizedBox(height: 4),
                 Text('Powered by GrowthOS', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
                 const SizedBox(height: 4),
-                Text('Sign in to your account', style: TextStyle(color: Colors.grey.shade600)),
+                Text(l.loginTitle, style: TextStyle(color: Colors.grey.shade600)),
                 const SizedBox(height: 32),
 
                 // Toggle email / phone
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    ChoiceChip(label: const Text('Email'), selected: !_usePhone, onSelected: (_) => setState(() { _usePhone = false; _otpSent = false; })),
+                    ChoiceChip(label: Text(l.email), selected: !_usePhone, onSelected: (_) => setState(() { _usePhone = false; _otpSent = false; })),
                     const SizedBox(width: 8),
-                    ChoiceChip(label: const Text('Phone'), selected: _usePhone, onSelected: (_) => setState(() { _usePhone = true; _otpSent = false; })),
+                    ChoiceChip(label: Text(l.phoneLabel), selected: _usePhone, onSelected: (_) => setState(() { _usePhone = true; _otpSent = false; })),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -254,10 +256,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         TextFormField(
                           controller: _emailCtrl,
-                          decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email), border: OutlineInputBorder()),
+                          decoration: InputDecoration(labelText: l.email, prefixIcon: const Icon(Icons.email), border: const OutlineInputBorder()),
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Email is required';
-                            if (!v.contains('@')) return 'Enter a valid email';
+                            if (v == null || v.trim().isEmpty) return l.emailRequired;
+                            if (!v.contains('@')) return l.enterValidEmail;
                             return null;
                           },
                         ),
@@ -265,10 +267,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: _passCtrl,
                           obscureText: true,
-                          decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock), border: OutlineInputBorder()),
+                          decoration: InputDecoration(labelText: l.password, prefixIcon: const Icon(Icons.lock), border: const OutlineInputBorder()),
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Password is required';
-                            if (v.length < 6) return 'Minimum 6 characters';
+                            if (v == null || v.trim().isEmpty) return l.passwordRequired;
+                            if (v.length < 6) return l.minSixChars;
                             return null;
                           },
                         ),
@@ -284,7 +286,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             child: _emailLoading
                                 ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Text('Sign In', style: TextStyle(color: Colors.white, fontSize: 16)),
+                                : Text(l.signIn, style: const TextStyle(color: Colors.white, fontSize: 16)),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -296,7 +298,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 builder: (_) => const ForgotPasswordScreen(),
                               ));
                             },
-                            child: Text('Forgot Password?', style: TextStyle(color: Colors.indigo.shade400, fontSize: 13)),
+                            child: Text(l.forgotPassword, style: TextStyle(color: Colors.indigo.shade400, fontSize: 13)),
                           ),
                         ),
                       ],
@@ -307,7 +309,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _phoneCtrl,
                     keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone), border: OutlineInputBorder(), prefixText: '+91 '),
+                    decoration: InputDecoration(labelText: l.phoneNumber, prefixIcon: const Icon(Icons.phone), border: const OutlineInputBorder(), prefixText: '+91 '),
                   ),
                   const SizedBox(height: 16),
                   if (!_otpSent)
@@ -319,14 +321,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
                         child: _phoneLoading
                             ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Text('Send OTP', style: TextStyle(color: Colors.white, fontSize: 16)),
+                            : Text(l.sendOtp, style: const TextStyle(color: Colors.white, fontSize: 16)),
                       ),
                     )
                   else ...[
                     TextFormField(
                       controller: _otpCtrl,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Enter 6-digit OTP', prefixIcon: Icon(Icons.pin), border: OutlineInputBorder()),
+                      decoration: InputDecoration(labelText: l.enterOtp, prefixIcon: const Icon(Icons.pin), border: const OutlineInputBorder()),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -337,7 +339,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
                         child: _phoneLoading
                             ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Text('Verify OTP', style: TextStyle(color: Colors.white, fontSize: 16)),
+                            : Text(l.verifyOtp, style: const TextStyle(color: Colors.white, fontSize: 16)),
                       ),
                     ),
                   ],
@@ -351,7 +353,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Expanded(child: Divider(color: Colors.grey.shade300)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('or continue with', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                      child: Text(l.orContinueWith, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                     ),
                     Expanded(child: Divider(color: Colors.grey.shade300)),
                   ],
@@ -367,7 +369,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     icon: _socialLoading
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.g_mobiledata, size: 24, color: Colors.red),
-                    label: const Text('Continue with Google'),
+                    label: Text(l.continueWithGoogle),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: Colors.grey.shade300),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -385,7 +387,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     icon: _socialLoading
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.facebook, size: 22, color: Color(0xFF1877F2)),
-                    label: const Text('Continue with Facebook'),
+                    label: Text(l.continueWithFacebook),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: Colors.grey.shade300),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -400,7 +402,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       builder: (_) => SignupScreen(onSignupSuccess: widget.onLoginSuccess),
                     ));
                   },
-                  child: const Text("Don't have an account? Sign up"),
+                  child: Text(l.dontHaveAccount),
                 ),
               ],
             ),

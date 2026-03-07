@@ -3,8 +3,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'firebase_options.dart';
+import 'l10n/app_localizations.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
+import 'services/locale_service.dart';
 import 'services/shop_config.dart';
 import 'repositories/api_sales_repository.dart';
 import 'repositories/dummy_sales_repository.dart';
@@ -24,8 +26,11 @@ void main() async {
   );
   // Initialize Firebase Analytics
   FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
-  // Load persisted shop config
-  await ShopConfig.instance.load();
+  // Load persisted shop config and locale
+  await Future.wait([
+    ShopConfig.instance.load(),
+    LocaleService.instance.load(),
+  ]);
   runApp(const MyApp());
 }
 
@@ -44,14 +49,24 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    // Rebuild when the user changes the language
+    LocaleService.instance.locale.addListener(() {
+      if (mounted) setState(() {});
+    });
     // Listen to Firebase auth state
     _authService.authStateChanges.listen((user) async {
       // Load user-scoped config when auth state changes
       if (user != null) {
-        await ShopConfig.instance.loadForUser(user.uid);
+        await Future.wait([
+          ShopConfig.instance.loadForUser(user.uid),
+          LocaleService.instance.loadForUser(user.uid),
+        ]);
         FirebaseAnalytics.instance.logLogin(loginMethod: user.providerData.isNotEmpty ? user.providerData.first.providerId : 'unknown');
       } else {
-        await ShopConfig.instance.load(); // reset to defaults
+        await Future.wait([
+          ShopConfig.instance.load(), // reset to defaults
+          LocaleService.instance.load(),
+        ]);
       }
       if (mounted) {
         setState(() {
@@ -74,7 +89,10 @@ class _MyAppState extends State<MyApp> {
   Future<void> _handleLoginSuccess() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      await ShopConfig.instance.loadForUser(user.uid);
+      await Future.wait([
+        ShopConfig.instance.loadForUser(user.uid),
+        LocaleService.instance.loadForUser(user.uid),
+      ]);
     }
     if (mounted) setState(() => _isLoggedIn = true);
   }
@@ -98,6 +116,9 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: 'GrowthOS',
       debugShowCheckedModeBanner: false,
+      locale: LocaleService.instance.locale.value,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(
         primarySwatch: Colors.indigo,
         scaffoldBackgroundColor: const Color(0xFFF5F6FA),
@@ -140,12 +161,15 @@ class _AppShellState extends State<AppShell> {
     _salesRepo = SalesRepositoryFacade(_apiRepo, _dummyRepo);
   }
 
-  static const _navItems = [
-    {'icon': Icons.dashboard, 'label': 'Dashboard'},
-    {'icon': Icons.inventory_2, 'label': 'Inventory'},
-    {'icon': Icons.receipt_long, 'label': 'Sales History'},
-    {'icon': Icons.settings, 'label': 'Settings'},
-  ];
+  List<Map<String, dynamic>> _localizedNavItems(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return [
+      {'icon': Icons.dashboard, 'label': l.navDashboard},
+      {'icon': Icons.inventory_2, 'label': l.navInventory},
+      {'icon': Icons.receipt_long, 'label': l.navSalesHistory},
+      {'icon': Icons.settings, 'label': l.navSettings},
+    ];
+  }
 
   // Icon/color sets shared across avatar picker and display
   static const _avatarIcons = [
@@ -471,8 +495,9 @@ class _AppShellState extends State<AppShell> {
           },
         ),
         const Divider(height: 1),
-        ...List.generate(_navItems.length, (i) {
-          final item = _navItems[i];
+        ...List.generate(_localizedNavItems(context).length, (i) {
+          final items = _localizedNavItems(context);
+          final item = items[i];
           final selected = _selectedIndex == i;
           return Material(
             color: selected ? Colors.indigo.shade50 : Colors.transparent,
@@ -512,7 +537,7 @@ class _AppShellState extends State<AppShell> {
                 children: [
                   Icon(Icons.logout, size: 20, color: Colors.red.shade400),
                   const SizedBox(width: 12),
-                  Text('Logout', style: TextStyle(color: Colors.red.shade400)),
+                  Text(AppLocalizations.of(context).logout, style: TextStyle(color: Colors.red.shade400)),
                 ],
               ),
             ),

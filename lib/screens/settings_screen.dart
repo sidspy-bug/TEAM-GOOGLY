@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../l10n/app_localizations.dart';
+import '../services/locale_service.dart';
 import '../services/shop_config.dart';
 
 /// Fully operable Settings screen with Account, Shop Name, Currency,
-/// Notifications toggle, Theme toggle, and Delete Account.
+/// Notifications toggle, Theme toggle, Language selector, and Delete Account.
 class SettingsScreen extends StatefulWidget {
   final VoidCallback onLogout;
   const SettingsScreen({super.key, required this.onLogout});
@@ -15,13 +17,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _auth = FirebaseAuth.instance;
 
-
   String _currency = '₹ INR';
   bool _notificationsEnabled = true;
   bool _isDarkTheme = false;
 
   // ── Account Details Dialog ──────────────────────────────────────────
   void _showAccountDetails() {
+    final l = AppLocalizations.of(context);
     final user = _auth.currentUser;
     final providers = user?.providerData.map((p) {
       switch (p.providerId) {
@@ -36,14 +38,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         default:
           return p.providerId;
       }
-    }).toList() ?? ['Unknown'];
+    }).toList() ?? [l.unknown];
 
     final createdAt = user?.metadata.creationTime;
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Account Details'),
+        title: Text(l.accountDetails),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,15 +65,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _detailRow('Name', user?.displayName ?? 'Not set'),
+            _detailRow(l.nameLabel, user?.displayName ?? l.notSet),
             const SizedBox(height: 8),
-            _detailRow('Email', user?.email ?? 'Not set'),
+            _detailRow(l.email, user?.email ?? l.notSet),
             const SizedBox(height: 8),
-            _detailRow('Provider(s)', providers.join(', ')),
+            _detailRow(l.providerLabel, providers.join(', ')),
             const SizedBox(height: 8),
-            _detailRow('Created', createdAt != null
+            _detailRow(l.createdLabel, createdAt != null
                 ? '${createdAt.day}/${createdAt.month}/${createdAt.year}'
-                : 'Unknown'),
+                : l.unknown),
             const SizedBox(height: 20),
             // Delete Account button
             SizedBox(
@@ -82,7 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   side: const BorderSide(color: Colors.red),
                 ),
                 icon: const Icon(Icons.delete_forever),
-                label: const Text('Delete Account'),
+                label: Text(l.deleteAccount),
                 onPressed: () {
                   Navigator.pop(ctx);
                   _confirmDeleteAccount();
@@ -92,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.close)),
         ],
       ),
     );
@@ -118,6 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ── Delete Account ──────────────────────────────────────────────────
   void _confirmDeleteAccount() {
+    final l = AppLocalizations.of(context);
     final confirmCtrl = TextEditingController();
     bool canDelete = false;
 
@@ -129,21 +132,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               Icon(Icons.warning_amber_rounded, color: Colors.red.shade600, size: 28),
               const SizedBox(width: 8),
-              const Text('Delete Account', style: TextStyle(color: Colors.red)),
+              Text(l.deleteAccount, style: const TextStyle(color: Colors.red)),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'This will permanently delete:',
-                style: TextStyle(fontWeight: FontWeight.w600),
+              Text(
+                l.thisWillDelete,
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              _deleteItem('Your account and login credentials'),
-              _deleteItem('Shop name, avatar, and all settings'),
-              _deleteItem('All locally stored data'),
+              _deleteItem(l.deleteItemCredentials),
+              _deleteItem(l.deleteItemShopSettings),
+              _deleteItem(l.deleteItemLocalData),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -153,12 +156,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   border: Border.all(color: Colors.red.shade200),
                 ),
                 child: Text(
-                  'This action cannot be undone.',
+                  l.cannotBeUndone,
                   style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w600, fontSize: 13),
                 ),
               ),
               const SizedBox(height: 16),
-              Text('Type DELETE to confirm:', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+              Text(l.typeDeleteToConfirm, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
               const SizedBox(height: 8),
               TextField(
                 controller: confirmCtrl,
@@ -174,7 +177,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.cancel)),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: canDelete ? Colors.red : Colors.grey.shade300,
@@ -186,7 +189,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       await _deleteAccount();
                     }
                   : null,
-              child: const Text('Delete Permanently'),
+              child: Text(l.deletePermanently),
             ),
           ],
         ),
@@ -208,22 +211,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _deleteAccount() async {
+    final l = AppLocalizations.of(context);
     try {
-      // Clear all local data first
       await ShopConfig.instance.clearAll();
-      // Delete the Firebase account
       await _auth.currentUser?.delete();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account and all data deleted permanently.')),
+          SnackBar(content: Text('${l.deleteAccount}: ${l.success}')),
         );
         widget.onLogout();
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        String msg = 'Failed to delete account.';
+        String msg = l.error;
         if (e.code == 'requires-recent-login') {
-          msg = 'For security, please sign out, sign back in, and try again.';
+          msg = l.requiresRecentLogin;
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(msg), backgroundColor: Colors.red),
@@ -232,7 +234,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete account.'), backgroundColor: Colors.red),
+          SnackBar(content: Text(l.error), backgroundColor: Colors.red),
         );
       }
     }
@@ -240,21 +242,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ── Shop Name Editor ────────────────────────────────────────────────
   void _editShopName() {
+    final l = AppLocalizations.of(context);
     final ctrl = TextEditingController(text: ShopConfig.instance.shopName.value);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Edit Shop Name'),
+        title: Text(l.editShopName),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Shop Name',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: l.shopName,
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.cancel)),
           ElevatedButton(
             onPressed: () async {
               if (ctrl.text.trim().isNotEmpty) {
@@ -262,11 +265,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Navigator.pop(ctx);
                 setState(() {});
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Shop name updated')),
+                  SnackBar(content: Text(l.shopNameUpdated)),
                 );
               }
             },
-            child: const Text('Save'),
+            child: Text(l.save),
           ),
         ],
       ),
@@ -275,18 +278,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ── Currency Selector ───────────────────────────────────────────────
   void _selectCurrency() {
+    final l = AppLocalizations.of(context);
     const currencies = ['₹ INR', '\$ USD', '€ EUR', '£ GBP', '¥ JPY'];
     showDialog(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: const Text('Select Currency'),
+        title: Text(l.selectCurrency),
         children: currencies.map((c) {
           return SimpleDialogOption(
             onPressed: () {
               setState(() => _currency = c);
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Currency set to $c')),
+                SnackBar(content: Text('${l.currency}: $c')),
               );
             },
             child: Row(
@@ -302,8 +306,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // ── Language Selector ───────────────────────────────────────────────
+  void _selectLanguage() {
+    final l = AppLocalizations.of(context);
+    final locales = LocaleService.supportedLocales;
+    showDialog(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(l.selectLanguage),
+        children: locales.map((locale) {
+          final isCurrent = LocaleService.instance.locale.value.languageCode == locale.languageCode;
+          final name = l.languageName(locale.languageCode);
+          return SimpleDialogOption(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await LocaleService.instance.setLocale(locale);
+            },
+            child: Row(
+              children: [
+                if (isCurrent) const Icon(Icons.check, color: Colors.indigo, size: 18),
+                if (isCurrent) const SizedBox(width: 8),
+                if (!isCurrent) const SizedBox(width: 26),
+                Text(name, style: TextStyle(fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal)),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final user = _auth.currentUser;
 
     return SingleChildScrollView(
@@ -311,7 +346,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(l.settings, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
           Card(
             child: Column(
@@ -319,8 +354,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // Account
                 ListTile(
                   leading: const Icon(Icons.person),
-                  title: const Text('Account'),
-                  subtitle: Text(user?.email ?? 'Not signed in'),
+                  title: Text(l.account),
+                  subtitle: Text(user?.email ?? l.notSignedIn),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _showAccountDetails,
                 ),
@@ -331,7 +366,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   builder: (_, shopName, __) {
                     return ListTile(
                       leading: const Icon(Icons.store),
-                      title: const Text('Shop Name'),
+                      title: Text(l.shopName),
                       subtitle: Text(shopName),
                       trailing: const Icon(Icons.edit, size: 18),
                       onTap: _editShopName,
@@ -342,23 +377,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // Currency
                 ListTile(
                   leading: const Icon(Icons.currency_rupee),
-                  title: const Text('Currency'),
+                  title: Text(l.currency),
                   subtitle: Text(_currency),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _selectCurrency,
                 ),
                 const Divider(height: 1),
+                // Language
+                ValueListenableBuilder<Locale>(
+                  valueListenable: LocaleService.instance.locale,
+                  builder: (_, locale, __) {
+                    return ListTile(
+                      leading: const Icon(Icons.language),
+                      title: Text(l.language),
+                      subtitle: Text(l.languageName(locale.languageCode)),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: _selectLanguage,
+                    );
+                  },
+                ),
+                const Divider(height: 1),
                 // Notifications
                 ListTile(
                   leading: const Icon(Icons.notifications),
-                  title: const Text('Notifications'),
-                  subtitle: Text(_notificationsEnabled ? 'Low-stock alerts enabled' : 'Alerts disabled'),
+                  title: Text(l.notifications),
+                  subtitle: Text(_notificationsEnabled ? l.lowStockAlertsEnabled : l.alertsDisabled),
                   trailing: Switch(
                     value: _notificationsEnabled,
                     onChanged: (v) {
                       setState(() => _notificationsEnabled = v);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(v ? 'Notifications enabled' : 'Notifications disabled')),
+                        SnackBar(content: Text(v ? l.notificationsEnabledMsg : l.notificationsDisabledMsg)),
                       );
                     },
                   ),
@@ -367,14 +416,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // Theme
                 ListTile(
                   leading: const Icon(Icons.color_lens),
-                  title: const Text('Theme'),
-                  subtitle: Text(_isDarkTheme ? 'Dark' : 'Light'),
+                  title: Text(l.theme),
+                  subtitle: Text(_isDarkTheme ? l.darkTheme : l.lightTheme),
                   trailing: Switch(
                     value: _isDarkTheme,
                     onChanged: (v) {
                       setState(() => _isDarkTheme = v);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(v ? 'Dark theme selected (visual change coming soon)' : 'Light theme selected')),
+                        SnackBar(content: Text(v ? l.darkThemeMsg : l.lightThemeMsg)),
                       );
                     },
                   ),
@@ -388,16 +437,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 ListTile(
                   leading: const Icon(Icons.info_outline),
-                  title: const Text('About'),
-                  subtitle: const Text('GrowthOS v0.1.0'),
+                  title: Text(l.about),
+                  subtitle: Text(l.aboutVersion),
                   onTap: () {
                     showAboutDialog(
                       context: context,
-                      applicationName: 'GrowthOS',
+                      applicationName: l.appName,
                       applicationVersion: '0.1.0',
                       applicationIcon: Icon(Icons.storefront, size: 48, color: Colors.indigo.shade400),
                       children: [
-                        const Text('AI-Powered Business Insights for Small Shop Owners.'),
+                        Text(l.aboutDescription),
                       ],
                     );
                   },
@@ -405,7 +454,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text('Logout', style: TextStyle(color: Colors.red)),
+                  title: Text(l.logout, style: const TextStyle(color: Colors.red)),
                   onTap: widget.onLogout,
                 ),
               ],

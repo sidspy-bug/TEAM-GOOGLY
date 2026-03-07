@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../models/sale.dart';
 import '../repositories/sales_repository.dart';
 
@@ -84,7 +85,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               // Header row with title and date filter
               Row(
                 children: [
-                  const Text('Sales History', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(AppLocalizations.of(context).salesHistory, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const Spacer(),
                   if (_dateRange != null) ...[
                     Chip(
@@ -99,7 +100,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ],
                   OutlinedButton.icon(
                     icon: const Icon(Icons.date_range, size: 18),
-                    label: const Text('Filter by Date'),
+                    label: Text(AppLocalizations.of(context).filterByDate),
                     onPressed: _pickDateRange,
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -120,12 +121,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                         Icon(Icons.receipt_long, color: Colors.indigo.shade600, size: 22),
                         const SizedBox(width: 12),
                         Text(
-                          'Total Sales: ₹${sales.fold<double>(0, (sum, s) => sum + s.dailyRevenue).toStringAsFixed(0)}',
+                          '${l.totalLabel}: ₹${sales.fold<double>(0, (sum, s) => sum + s.dailyRevenue).toStringAsFixed(0)}',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.indigo.shade800),
                         ),
                         const SizedBox(width: 24),
                         Text(
-                          '${sales.length} transactions',
+                          '${sales.length} ${AppLocalizations.of(context).transactionsLabel}',
                           style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                         ),
                       ],
@@ -135,10 +136,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               if (sales.isNotEmpty) const SizedBox(height: 12),
 
               if (sales.isEmpty)
-                const Card(
+                Card(
                   child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(child: Text('No sales found for the selected period.')),
+                    padding: const EdgeInsets.all(32),
+                    child: Center(child: Text(AppLocalizations.of(context).noSalesFound)),
                   ),
                 )
               else
@@ -147,6 +148,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   final dateSales = entry.value;
                   final dayRevenue = dateSales.fold<double>(0, (sum, s) => sum + s.dailyRevenue);
                   final dayProfit = dateSales.fold<double>(0, (sum, s) => sum + s.estimatedProfit);
+                  final l = AppLocalizations.of(context);
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,9 +167,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             const SizedBox(width: 8),
                             Text(dateLabel, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo.shade700)),
                             const Spacer(),
-                            Text('Revenue: ₹${dayRevenue.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                            Text('${l.revenueLabel}: ₹${dayRevenue.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                             const SizedBox(width: 12),
-                            Text('Profit: ₹${dayProfit.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: dayProfit >= 0 ? Colors.green.shade700 : Colors.red)),
+                            Text('${l.profitLabel}: ₹${dayProfit.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: dayProfit >= 0 ? Colors.green.shade700 : Colors.red)),
                           ],
                         ),
                       ),
@@ -178,12 +180,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           child: DataTable(
                             columnSpacing: 24,
                             headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
-                            columns: const [
-                              DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Product', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
-                              DataColumn(label: Text('Payment Mode', style: TextStyle(fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Amount (₹)', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                            columns: [
+                              DataColumn(label: Text(l.dateLabel, style: const TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text(l.product, style: const TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text(l.quantityLabel, style: const TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                              DataColumn(label: Text(l.modeLabel, style: const TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text('${l.totalLabel} (₹)', style: const TextStyle(fontWeight: FontWeight.bold)), numeric: true),
                             ],
                             rows: dateSales.map((s) {
                               return DataRow(cells: [

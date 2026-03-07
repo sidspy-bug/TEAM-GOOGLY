@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../repositories/sales_repository.dart';
 import '../models/dashboard_summary.dart';
 import '../widgets/summary_card.dart';
@@ -47,17 +48,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return FutureBuilder<DashboardSummary>(
       future: _summaryFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
+          return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Loading...'),
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(l.loading),
               ],
             ),
           );
@@ -70,12 +72,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 const Icon(Icons.error, size: 48, color: Colors.red),
                 const SizedBox(height: 16),
-                const Text('Error loading dashboard'),
+                Text(l.errorLoadingDashboard),
                 const SizedBox(height: 8),
                 ElevatedButton(
                   onPressed: () => setState(
                       () => _summaryFuture = widget.salesRepository.getDashboardSummary()),
-                  child: const Text('Retry'),
+                  child: Text(l.retry),
                 ),
               ],
             ),
@@ -83,7 +85,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         if (!snapshot.hasData) {
-          return const Center(child: Text('No data'));
+          return Center(child: Text(l.noData));
         }
 
         final summary = snapshot.data!;
@@ -184,7 +186,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             return Padding(
               padding: const EdgeInsets.all(16),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Low Stock Products', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(AppLocalizations.of(ctx).lowStockProducts, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Expanded(
                   child: ListView.builder(
@@ -192,7 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     itemBuilder: (ctx, i) => ListTile(
                       leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
                       title: Text(lowStock[i].productName),
-                      subtitle: Text('Stock: ${lowStock[i].currentStock}'),
+                      subtitle: Text('${AppLocalizations.of(ctx).stockLabel}: ${lowStock[i].currentStock}'),
                     ),
                   ),
                 ),

@@ -19,6 +19,7 @@ db.exec(`
     shop_name TEXT DEFAULT 'My Shop',
     avatar_index INTEGER DEFAULT -1,
     onboarded INTEGER DEFAULT 0,
+    language TEXT DEFAULT 'en',
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
@@ -65,5 +66,15 @@ db.exec(`
 `);
 
 console.log("✅ SQLite database initialized at:", dbPath);
+
+// Migration: add language column to existing databases that predate this field
+try {
+  db.exec(`ALTER TABLE user_settings ADD COLUMN language TEXT DEFAULT 'en'`);
+} catch (err) {
+  // Ignore "duplicate column" errors; log anything unexpected
+  if (!err.message || !err.message.includes('duplicate column')) {
+    console.warn('Migration warning (language column):', err.message);
+  }
+}
 
 module.exports = db;
