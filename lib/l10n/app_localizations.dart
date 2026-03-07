@@ -103,6 +103,27 @@ class AppLocalizations {
   String get confirmPassword => _t.confirmPassword;
   String get signUp => _t.signUp;
   String get alreadyHaveAccount => _t.alreadyHaveAccount;
+  String get joinGrowthOS => _t.joinGrowthOS;
+  String get nameRequired => _t.nameRequired;
+  String get confirmPasswordRequired => _t.confirmPasswordRequired;
+  String get passwordsDoNotMatch => _t.passwordsDoNotMatch;
+  String get orSignUpWith => _t.orSignUpWith;
+
+  // ── Forgot Password ──────────────────────────────────────────────────
+  String get resetPassword => _t.resetPassword;
+  String get resetPasswordDesc => _t.resetPasswordDesc;
+  String get sendResetLink => _t.sendResetLink;
+  String get backToLogin => _t.backToLogin;
+  String get checkYourEmail => _t.checkYourEmail;
+  String get emailSentDesc => _t.emailSentDesc;
+  String get backToSignIn => _t.backToSignIn;
+  String get didntReceiveEmail => _t.didntReceiveEmail;
+  String get resend => _t.resend;
+  String get checkSpamTip => _t.checkSpamTip;
+  String get stepEmailSent => _t.stepEmailSent;
+  String get stepClickLink => _t.stepClickLink;
+  String get stepNewPassword => _t.stepNewPassword;
+  String resendInSeconds(int s) => _t.resendInSeconds(s);
 
   // ── Onboarding ───────────────────────────────────────────────────────
   String get letsSetupStore => _t.letsSetupStore;
@@ -288,6 +309,27 @@ abstract class _Strings {
   String get confirmPassword;
   String get signUp;
   String get alreadyHaveAccount;
+  String get joinGrowthOS;
+  String get nameRequired;
+  String get confirmPasswordRequired;
+  String get passwordsDoNotMatch;
+  String get orSignUpWith;
+
+  // Forgot Password
+  String get resetPassword;
+  String get resetPasswordDesc;
+  String get sendResetLink;
+  String get backToLogin;
+  String get checkYourEmail;
+  String get emailSentDesc;
+  String get backToSignIn;
+  String get didntReceiveEmail;
+  String get resend;
+  String get checkSpamTip;
+  String get stepEmailSent;
+  String get stepClickLink;
+  String get stepNewPassword;
+  String resendInSeconds(int s);
 
   // Onboarding
   String get letsSetupStore;
@@ -441,6 +483,25 @@ class _En extends _Strings {
   @override String get confirmPassword => 'Confirm Password';
   @override String get signUp => 'Sign Up';
   @override String get alreadyHaveAccount => 'Already have an account? Sign in';
+  @override String get joinGrowthOS => 'Join GrowthOS';
+  @override String get nameRequired => 'Name is required';
+  @override String get confirmPasswordRequired => 'Confirm your password';
+  @override String get passwordsDoNotMatch => 'Passwords do not match';
+  @override String get orSignUpWith => 'or sign up with';
+  @override String get resetPassword => 'Reset Password';
+  @override String get resetPasswordDesc => "Enter your registered email and we'll send you a link to reset your password.";
+  @override String get sendResetLink => 'Send Reset Link';
+  @override String get backToLogin => 'Back to Login';
+  @override String get checkYourEmail => 'Check Your Email';
+  @override String get emailSentDesc => "We've sent a password reset link to your email. Click the link in the email to set a new password.";
+  @override String get backToSignIn => 'Back to Sign In';
+  @override String get didntReceiveEmail => "Didn't receive the email? ";
+  @override String get resend => 'Resend';
+  @override String get checkSpamTip => "Check your spam/junk folder if you don't see the email. The link expires in 1 hour.";
+  @override String get stepEmailSent => 'Email sent';
+  @override String get stepClickLink => 'Click link';
+  @override String get stepNewPassword => 'New password';
+  @override String resendInSeconds(int s) => 'Resend in ${s}s';
 
   @override String get letsSetupStore => "Let's set up your store";
   @override String get whatsYourName => "What's your name?";
@@ -589,6 +650,25 @@ class _Hi extends _Strings {
   @override String get confirmPassword => 'पासवर्ड की पुष्टि करें';
   @override String get signUp => 'साइन अप';
   @override String get alreadyHaveAccount => 'पहले से खाता है? साइन इन करें';
+  @override String get joinGrowthOS => 'GrowthOS से जुड़ें';
+  @override String get nameRequired => 'नाम आवश्यक है';
+  @override String get confirmPasswordRequired => 'पासवर्ड की पुष्टि करें';
+  @override String get passwordsDoNotMatch => 'पासवर्ड मेल नहीं खाते';
+  @override String get orSignUpWith => 'या साइन अप करें';
+  @override String get resetPassword => 'पासवर्ड रीसेट करें';
+  @override String get resetPasswordDesc => 'अपना पंजीकृत ईमेल दर्ज करें और हम आपको पासवर्ड रीसेट करने का लिंक भेजेंगे।';
+  @override String get sendResetLink => 'रीसेट लिंक भेजें';
+  @override String get backToLogin => 'लॉगिन पर वापस जाएं';
+  @override String get checkYourEmail => 'अपना ईमेल जांचें';
+  @override String get emailSentDesc => 'हमने आपके ईमेल पर पासवर्ड रीसेट लिंक भेजा है। नया पासवर्ड सेट करने के लिए ईमेल में लिंक पर क्लिक करें।';
+  @override String get backToSignIn => 'साइन इन पर वापस जाएं';
+  @override String get didntReceiveEmail => 'ईमेल नहीं मिला? ';
+  @override String get resend => 'पुनः भेजें';
+  @override String get checkSpamTip => 'यदि ईमेल नहीं दिखे तो स्पैम/जंक फ़ोल्डर देखें। लिंक 1 घंटे में समाप्त हो जाता है।';
+  @override String get stepEmailSent => 'ईमेल भेजा गया';
+  @override String get stepClickLink => 'लिंक पर क्लिक करें';
+  @override String get stepNewPassword => 'नया पासवर्ड';
+  @override String resendInSeconds(int s) => '${s}s में पुनः भेजें';
 
   @override String get letsSetupStore => 'आइए अपनी दुकान सेट करें';
   @override String get whatsYourName => 'आपका नाम क्या है?';
@@ -737,6 +817,25 @@ class _Ta extends _Strings {
   @override String get confirmPassword => 'கடவுச்சொல் உறுதிப்படுத்து';
   @override String get signUp => 'பதிவு செய்';
   @override String get alreadyHaveAccount => 'ஏற்கனவே கணக்கு உள்ளதா? உள்நுழைக';
+  @override String get joinGrowthOS => 'GrowthOS இல் சேருங்கள்';
+  @override String get nameRequired => 'பெயர் தேவை';
+  @override String get confirmPasswordRequired => 'கடவுச்சொல்லை உறுதிப்படுத்துங்கள்';
+  @override String get passwordsDoNotMatch => 'கடவுச்சொற்கள் பொருந்தவில்லை';
+  @override String get orSignUpWith => 'அல்லது இதன் மூலம் பதிவு செய்யுங்கள்';
+  @override String get resetPassword => 'கடவுச்சொல் மீட்டமை';
+  @override String get resetPasswordDesc => 'உங்கள் பதிவு செய்த மின்னஞ்சலை உள்ளிடுங்கள், நாங்கள் கடவுச்சொல் மீட்டமைக்க இணைப்பு அனுப்புவோம்.';
+  @override String get sendResetLink => 'மீட்டமைப்பு இணைப்பு அனுப்பு';
+  @override String get backToLogin => 'உள்நுழைவுக்கு திரும்பு';
+  @override String get checkYourEmail => 'உங்கள் மின்னஞ்சலைப் பார்க்கவும்';
+  @override String get emailSentDesc => 'உங்கள் மின்னஞ்சலுக்கு கடவுச்சொல் மீட்டமைப்பு இணைப்பு அனுப்பப்பட்டது. புதிய கடவுச்சொல் அமைக்க இணைப்பை கிளிக் செய்யுங்கள்.';
+  @override String get backToSignIn => 'உள்நுழைவுக்கு திரும்பு';
+  @override String get didntReceiveEmail => 'மின்னஞ்சல் வரவில்லையா? ';
+  @override String get resend => 'மீண்டும் அனுப்பு';
+  @override String get checkSpamTip => 'மின்னஞ்சல் தெரியவில்லை என்றால் ஸ்பாம்/ஜங்க் கோப்பகத்தை சரிபாருங்கள். இணைப்பு 1 மணி நேரத்தில் காலாவதியாகும்.';
+  @override String get stepEmailSent => 'மின்னஞ்சல் அனுப்பப்பட்டது';
+  @override String get stepClickLink => 'இணைப்பை கிளிக் செய்யுங்கள்';
+  @override String get stepNewPassword => 'புதிய கடவுச்சொல்';
+  @override String resendInSeconds(int s) => '${s}s இல் மீண்டும் அனுப்பு';
 
   @override String get letsSetupStore => 'உங்கள் கடையை அமைக்கலாம்';
   @override String get whatsYourName => 'உங்கள் பெயர் என்ன?';
@@ -885,6 +984,25 @@ class _Mr extends _Strings {
   @override String get confirmPassword => 'पासवर्डची पुष्टी करा';
   @override String get signUp => 'साइन अप';
   @override String get alreadyHaveAccount => 'आधीच खाते आहे? साइन इन करा';
+  @override String get joinGrowthOS => 'GrowthOS मध्ये सामील व्हा';
+  @override String get nameRequired => 'नाव आवश्यक आहे';
+  @override String get confirmPasswordRequired => 'पासवर्ड नक्की करा';
+  @override String get passwordsDoNotMatch => 'पासवर्ड जुळत नाहीत';
+  @override String get orSignUpWith => 'किंवा याद्वारे साइन अप करा';
+  @override String get resetPassword => 'पासवर्ड रीसेट करा';
+  @override String get resetPasswordDesc => 'तुमचा नोंदणीकृत ईमेल प्रविष्ट करा, आम्ही तुम्हाला पासवर्ड रीसेट करण्यासाठी लिंक पाठवू.';
+  @override String get sendResetLink => 'रीसेट लिंक पाठवा';
+  @override String get backToLogin => 'लॉगिनकडे परत जा';
+  @override String get checkYourEmail => 'तुमचा ईमेल तपासा';
+  @override String get emailSentDesc => 'आम्ही तुमच्या ईमेलवर पासवर्ड रीसेट लिंक पाठवला आहे. नवीन पासवर्ड सेट करण्यासाठी ईमेलमधील लिंकवर क्लिक करा.';
+  @override String get backToSignIn => 'साइन इनकडे परत जा';
+  @override String get didntReceiveEmail => 'ईमेल मिळाला नाही? ';
+  @override String get resend => 'पुन्हा पाठवा';
+  @override String get checkSpamTip => 'ईमेल दिसत नसल्यास स्पॅम/जंक फोल्डर तपासा. लिंक 1 तासात कालबाह्य होतो.';
+  @override String get stepEmailSent => 'ईमेल पाठवला';
+  @override String get stepClickLink => 'लिंकवर क्लिक करा';
+  @override String get stepNewPassword => 'नवीन पासवर्ड';
+  @override String resendInSeconds(int s) => '${s}s मध्ये पुन्हा पाठवा';
 
   @override String get letsSetupStore => 'आपले दुकान सेट करूया';
   @override String get whatsYourName => 'आपले नाव काय आहे?';
