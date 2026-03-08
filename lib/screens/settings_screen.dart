@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../l10n/app_localizations.dart';
 import '../services/locale_service.dart';
 import '../services/shop_config.dart';
+import '../services/theme_service.dart';
 
 /// Fully operable Settings screen with Account, Shop Name, Currency,
 /// Notifications toggle, Theme toggle, Language selector, and Delete Account.
@@ -19,7 +20,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _currency = '₹ INR';
   bool _notificationsEnabled = true;
-  bool _isDarkTheme = false;
 
   // ── Account Details Dialog ──────────────────────────────────────────
   void _showAccountDetails() {
@@ -416,16 +416,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // Theme
                 ListTile(
                   leading: const Icon(Icons.color_lens),
-                  title: Text(l.theme),
-                  subtitle: Text(_isDarkTheme ? l.darkTheme : l.lightTheme),
-                  trailing: Switch(
-                    value: _isDarkTheme,
-                    onChanged: (v) {
-                      setState(() => _isDarkTheme = v);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(v ? l.darkThemeMsg : l.lightThemeMsg)),
-                      );
-                    },
+                  title: const Text('Theme'),
+                  subtitle: ValueListenableBuilder<ThemeMode>(
+                    valueListenable: ThemeService.instance.themeMode,
+                    builder: (_, mode, __) => Text(mode == ThemeMode.dark ? 'Dark' : 'Light'),
+                  ),
+                  trailing: ValueListenableBuilder<ThemeMode>(
+                    valueListenable: ThemeService.instance.themeMode,
+                    builder: (_, mode, __) => Switch(
+                      value: mode == ThemeMode.dark,
+                      onChanged: (v) async {
+                        await ThemeService.instance.setThemeMode(
+                          v ? ThemeMode.dark : ThemeMode.light,
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(v ? 'Dark theme enabled' : 'Light theme enabled')),
+                          );
+                        }
+                      },
+                    ),
                   ),
                 ),
               ],
