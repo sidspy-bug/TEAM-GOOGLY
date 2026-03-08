@@ -144,6 +144,7 @@ class DummySalesRepository implements SalesRepository {
         soldVsStock: soldVsStock,
       );
     } catch (e) {
+      // ignore: avoid_print
       print('Error in getDashboardSummary: $e');
       rethrow;
     }
