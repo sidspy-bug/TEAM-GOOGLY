@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/shop_config.dart';
+import 'services/theme_service.dart';
 import 'repositories/api_sales_repository.dart';
 import 'repositories/dummy_sales_repository.dart';
 import 'repositories/sales_repository_facade.dart';
@@ -26,6 +27,8 @@ void main() async {
   FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
   // Load persisted shop config
   await ShopConfig.instance.load();
+  // Load persisted theme preference
+  await ThemeService.instance.load();
   runApp(const MyApp());
 }
 
@@ -44,6 +47,8 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    // Rebuild when theme changes
+    ThemeService.instance.themeMode.addListener(_onThemeChanged);
     // Listen to Firebase auth state
     _authService.authStateChanges.listen((user) async {
       // Load user-scoped config when auth state changes
@@ -62,6 +67,16 @@ class _MyAppState extends State<MyApp> {
     });
     // Wire 401 handler to force logout
     ApiService().onUnauthorized = _handleLogout;
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    ThemeService.instance.themeMode.removeListener(_onThemeChanged);
+    super.dispose();
   }
 
   void _handleLogout() async {
@@ -107,6 +122,20 @@ class _MyAppState extends State<MyApp> {
         ),
         appBarTheme: const AppBarTheme(elevation: 0),
       ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        primarySwatch: Colors.indigo,
+        colorScheme: ColorScheme.dark(
+          primary: Colors.indigo.shade300,
+          secondary: Colors.indigoAccent,
+        ),
+        cardTheme: CardThemeData(
+          elevation: 1,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+        appBarTheme: const AppBarTheme(elevation: 0),
+      ),
+      themeMode: ThemeService.instance.themeMode.value,
       home: _initializing
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : _isLoggedIn

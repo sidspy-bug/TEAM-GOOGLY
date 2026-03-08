@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/shop_config.dart';
+import '../services/theme_service.dart';
 
 /// Fully operable Settings screen with Account, Shop Name, Currency,
 /// Notifications toggle, Theme toggle, and Delete Account.
@@ -18,7 +19,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _currency = '₹ INR';
   bool _notificationsEnabled = true;
-  bool _isDarkTheme = false;
 
   // ── Account Details Dialog ──────────────────────────────────────────
   void _showAccountDetails() {
@@ -368,15 +368,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ListTile(
                   leading: const Icon(Icons.color_lens),
                   title: const Text('Theme'),
-                  subtitle: Text(_isDarkTheme ? 'Dark' : 'Light'),
-                  trailing: Switch(
-                    value: _isDarkTheme,
-                    onChanged: (v) {
-                      setState(() => _isDarkTheme = v);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(v ? 'Dark theme selected (visual change coming soon)' : 'Light theme selected')),
-                      );
-                    },
+                  subtitle: ValueListenableBuilder<ThemeMode>(
+                    valueListenable: ThemeService.instance.themeMode,
+                    builder: (_, mode, __) => Text(mode == ThemeMode.dark ? 'Dark' : 'Light'),
+                  ),
+                  trailing: ValueListenableBuilder<ThemeMode>(
+                    valueListenable: ThemeService.instance.themeMode,
+                    builder: (_, mode, __) => Switch(
+                      value: mode == ThemeMode.dark,
+                      onChanged: (v) async {
+                        await ThemeService.instance.setThemeMode(
+                          v ? ThemeMode.dark : ThemeMode.light,
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(v ? 'Dark theme enabled' : 'Light theme enabled')),
+                          );
+                        }
+                      },
+                    ),
                   ),
                 ),
               ],
