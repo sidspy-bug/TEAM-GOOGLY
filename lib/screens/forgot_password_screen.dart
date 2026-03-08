@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../l10n/app_localizations.dart';
 
 /// Modern Forgot Password screen.
 /// Sends a real Firebase password-reset email and shows status feedback.
@@ -98,6 +99,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       body: Center(
@@ -122,7 +124,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 400),
-                      child: _sent ? _buildSentState() : _buildFormState(),
+                      child: _sent ? _buildSentState(l) : _buildFormState(l),
                     ),
                   ),
                 ),
@@ -132,7 +134,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 TextButton.icon(
                   onPressed: () => Navigator.of(context).pop(),
                   icon: Icon(Icons.arrow_back, size: 16, color: Colors.grey.shade500),
-                  label: Text('Back to Login', style: TextStyle(color: Colors.grey.shade500)),
+                  label: Text(l.backToLogin, style: TextStyle(color: Colors.grey.shade500)),
                 ),
               ],
             ),
@@ -143,7 +145,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   /// Form state — email input + send button
-  Widget _buildFormState() {
+  Widget _buildFormState(AppLocalizations l) {
     return Column(
       key: const ValueKey('form'),
       children: [
@@ -173,12 +175,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         ),
         const SizedBox(height: 24),
         Text(
-          'Reset Password',
+          l.resetPassword,
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
         ),
         const SizedBox(height: 8),
         Text(
-          'Enter your registered email and we\'ll send you a link to reset your password.',
+          l.resetPasswordDesc,
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.5),
         ),
@@ -192,15 +194,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
             keyboardType: TextInputType.emailAddress,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: 'Email Address',
+              labelText: l.email,
               prefixIcon: const Icon(Icons.email_outlined),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
               fillColor: Colors.grey.shade50,
             ),
             validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Email is required';
-              if (!v.contains('@') || !v.contains('.')) return 'Enter a valid email';
+              if (v == null || v.trim().isEmpty) return l.emailRequired;
+              if (!v.contains('@') || !v.contains('.')) return l.enterValidEmail;
               return null;
             },
             onFieldSubmitted: (_) => _sendResetEmail(),
@@ -227,7 +229,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                     height: 22,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
-                : const Text('Send Reset Link', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                : Text(l.sendResetLink, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           ),
         ),
       ],
@@ -235,7 +237,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   /// Success state — email sent confirmation
-  Widget _buildSentState() {
+  Widget _buildSentState(AppLocalizations l) {
     return Column(
       key: const ValueKey('sent'),
       children: [
@@ -262,7 +264,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         ),
         const SizedBox(height: 24),
         Text(
-          'Check Your Email',
+          l.checkYourEmail,
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green.shade700),
         ),
         const SizedBox(height: 12),
@@ -292,24 +294,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         ),
         const SizedBox(height: 16),
         Text(
-          'We\'ve sent a password reset link to your email. Click the link in the email to set a new password.',
+          l.emailSentDesc,
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.5),
         ),
         const SizedBox(height: 24),
 
         // Steps
-        _buildSteps(),
+        _buildSteps(l),
         const SizedBox(height: 24),
 
-        // Open email button
+        // Back to sign in button
         SizedBox(
           width: double.infinity,
           height: 48,
           child: ElevatedButton.icon(
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.login, size: 20),
-            label: const Text('Back to Sign In', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            label: Text(l.backToSignIn, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.indigo,
               foregroundColor: Colors.white,
@@ -325,7 +327,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'Didn\'t receive the email? ',
+              l.didntReceiveEmail,
               style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
             ),
             GestureDetector(
@@ -335,8 +337,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
               },
               child: Text(
                 _resendCooldown > 0
-                    ? 'Resend in ${_resendCooldown}s'
-                    : 'Resend',
+                    ? l.resendInSeconds(_resendCooldown)
+                    : l.resend,
                 style: TextStyle(
                   color: _resendCooldown > 0 ? Colors.grey.shade400 : Colors.indigo,
                   fontWeight: FontWeight.w600,
@@ -362,7 +364,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Check your spam/junk folder if you don\'t see the email. The link expires in 1 hour.',
+                  l.checkSpamTip,
                   style: TextStyle(fontSize: 12, color: Colors.amber.shade900, height: 1.4),
                 ),
               ),
@@ -373,15 +375,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     );
   }
 
-  Widget _buildSteps() {
+  Widget _buildSteps(AppLocalizations l) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _stepDot(1, 'Email sent', true),
+        _stepDot(1, l.stepEmailSent, true),
         _stepLine(true),
-        _stepDot(2, 'Click link', false),
+        _stepDot(2, l.stepClickLink, false),
         _stepLine(false),
-        _stepDot(3, 'New password', false),
+        _stepDot(3, l.stepNewPassword, false),
       ],
     );
   }

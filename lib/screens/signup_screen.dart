@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import 'email_verification_screen.dart';
 
@@ -103,6 +104,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -116,25 +118,25 @@ class _SignupScreenState extends State<SignupScreen> {
                 children: [
                   Icon(Icons.storefront, size: 64, color: Colors.indigo.shade400),
                   const SizedBox(height: 12),
-                  const Text('Create Account', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                  Text(l.createAccount, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.indigo)),
                   const SizedBox(height: 4),
-                  Text('Powered by GrowthOS', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                  Text('Powered by GrowthOS', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)), // brand name – intentionally kept in English
                   const SizedBox(height: 4),
-                  Text('Join GrowthOS', style: TextStyle(color: Colors.grey.shade600)),
+                  Text(l.joinGrowthOS, style: TextStyle(color: Colors.grey.shade600)),
                   const SizedBox(height: 32),
 
                   TextFormField(
                     controller: _nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person), border: OutlineInputBorder()),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                    decoration: InputDecoration(labelText: l.fullName, prefixIcon: const Icon(Icons.person), border: const OutlineInputBorder()),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? l.nameRequired : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _emailCtrl,
-                    decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email), border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: l.email, prefixIcon: const Icon(Icons.email), border: const OutlineInputBorder()),
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Email is required';
-                      if (!v.contains('@')) return 'Enter a valid email';
+                      if (v == null || v.trim().isEmpty) return l.emailRequired;
+                      if (!v.contains('@')) return l.enterValidEmail;
                       return null;
                     },
                   ),
@@ -142,10 +144,10 @@ class _SignupScreenState extends State<SignupScreen> {
                   TextFormField(
                     controller: _passCtrl,
                     obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock), border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: l.password, prefixIcon: const Icon(Icons.lock), border: const OutlineInputBorder()),
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Password is required';
-                      if (v.length < 6) return 'Minimum 6 characters';
+                      if (v == null || v.trim().isEmpty) return l.passwordRequired;
+                      if (v.length < 6) return l.minSixChars;
                       return null;
                     },
                   ),
@@ -153,10 +155,10 @@ class _SignupScreenState extends State<SignupScreen> {
                   TextFormField(
                     controller: _confirmCtrl,
                     obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Confirm Password', prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: l.confirmPassword, prefixIcon: const Icon(Icons.lock_outline), border: const OutlineInputBorder()),
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Confirm your password';
-                      if (v != _passCtrl.text) return 'Passwords do not match';
+                      if (v == null || v.trim().isEmpty) return l.confirmPasswordRequired;
+                      if (v != _passCtrl.text) return l.passwordsDoNotMatch;
                       return null;
                     },
                   ),
@@ -165,9 +167,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: _signup,
+                      onPressed: _signupLoading ? null : _signup,
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-                      child: const Text('Sign Up', style: TextStyle(color: Colors.white, fontSize: 16)),
+                      child: _signupLoading
+                          ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text(l.signUp, style: const TextStyle(color: Colors.white, fontSize: 16)),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -178,7 +182,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       Expanded(child: Divider(color: Colors.grey.shade300)),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('or sign up with', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                        child: Text(l.orSignUpWith, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                       ),
                       Expanded(child: Divider(color: Colors.grey.shade300)),
                     ],
@@ -194,7 +198,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       icon: _socialLoading
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.g_mobiledata, size: 24, color: Colors.red),
-                      label: const Text('Continue with Google'),
+                      label: Text(l.continueWithGoogle),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: Colors.grey.shade300),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -212,7 +216,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       icon: _socialLoading
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.facebook, size: 22, color: Color(0xFF1877F2)),
-                      label: const Text('Continue with Facebook'),
+                      label: Text(l.continueWithFacebook),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: Colors.grey.shade300),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -223,7 +227,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Already have an account? Login'),
+                    child: Text(l.alreadyHaveAccount),
                   ),
                 ],
               ),

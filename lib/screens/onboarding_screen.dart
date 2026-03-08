@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../l10n/app_localizations.dart';
 import '../services/shop_config.dart';
 
 /// Onboarding screen shown once after first sign-in.
@@ -94,15 +95,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _next() {
+    final l = AppLocalizations.of(context);
     if (_step == 0 && _nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your name'), backgroundColor: Colors.orange),
+        SnackBar(content: Text(l.pleaseEnterName), backgroundColor: Colors.orange),
       );
       return;
     }
     if (_step == 1 && _shopCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your shop name'), backgroundColor: Colors.orange),
+        SnackBar(content: Text(l.pleaseEnterShopName), backgroundColor: Colors.orange),
       );
       return;
     }
@@ -119,6 +121,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       body: Center(
@@ -132,13 +135,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 // GrowthOS branding
                 Icon(Icons.storefront, size: 48, color: Colors.indigo.shade400),
                 const SizedBox(height: 8),
-                const Text('GrowthOS', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                Text(l.appName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.indigo)),
                 const SizedBox(height: 4),
-                Text('Let\'s set up your store', style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+                Text(l.letsSetupStore, style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
                 const SizedBox(height: 24),
 
                 // Step indicators
-                _buildStepIndicator(),
+                _buildStepIndicator(l),
                 const SizedBox(height: 24),
 
                 // Main card
@@ -150,10 +153,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 300),
                       child: _step == 0
-                          ? _buildNameStep()
+                          ? _buildNameStep(l)
                           : _step == 1
-                              ? _buildShopStep()
-                              : _buildAvatarStep(),
+                              ? _buildShopStep(l)
+                              : _buildAvatarStep(l),
                     ),
                   ),
                 ),
@@ -167,7 +170,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       TextButton.icon(
                         onPressed: _back,
                         icon: const Icon(Icons.arrow_back, size: 18),
-                        label: const Text('Back'),
+                        label: Text(l.back),
                       )
                     else
                       const SizedBox(),
@@ -181,7 +184,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       child: _saving
                           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : Text(_step < 2 ? 'Next' : 'Get Started', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          : Text(_step < 2 ? l.next : l.getStarted, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
@@ -193,7 +196,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       setState(() => _selectedAvatar = -1);
                       _finish();
                     },
-                    child: Text('Skip for now', style: TextStyle(color: Colors.grey.shade500)),
+                    child: Text(l.skipForNow, style: TextStyle(color: Colors.grey.shade500)),
                   ),
               ],
             ),
@@ -203,15 +206,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildStepIndicator() {
+  Widget _buildStepIndicator(AppLocalizations l) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _dot(0, 'Your Name'),
+        _dot(0, l.yourName),
         _line(0),
-        _dot(1, 'Shop Name'),
+        _dot(1, l.shopNameLabel),
         _line(1),
-        _dot(2, 'Profile'),
+        _dot(2, l.profileLabel),
       ],
     );
   }
@@ -255,21 +258,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   // ── Step 1: Name ──────────────────────────────────────────────────
-  Widget _buildNameStep() {
+  Widget _buildNameStep(AppLocalizations l) {
     return Column(
       key: const ValueKey('name'),
       children: [
         Icon(Icons.person_outline, size: 48, color: Colors.indigo.shade300),
         const SizedBox(height: 16),
-        const Text('What\'s your name?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(l.whatsYourName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Text('This will be displayed on your profile', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+        Text(l.nameDisplayedProfile, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
         const SizedBox(height: 24),
         TextField(
           controller: _nameCtrl,
           textCapitalization: TextCapitalization.words,
           decoration: InputDecoration(
-            labelText: 'Full Name',
+            labelText: l.fullName,
             prefixIcon: const Icon(Icons.person),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             filled: true,
@@ -282,21 +285,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   // ── Step 2: Shop Name ─────────────────────────────────────────────
-  Widget _buildShopStep() {
+  Widget _buildShopStep(AppLocalizations l) {
     return Column(
       key: const ValueKey('shop'),
       children: [
         Icon(Icons.store, size: 48, color: Colors.indigo.shade300),
         const SizedBox(height: 16),
-        const Text('Name your shop', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(l.nameYourShop, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Text('This will appear in your sidebar and dashboard', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+        Text(l.shopNameDisplayed, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
         const SizedBox(height: 24),
         TextField(
           controller: _shopCtrl,
           textCapitalization: TextCapitalization.words,
           decoration: InputDecoration(
-            labelText: 'Shop Name',
+            labelText: l.shopNameLabel,
             prefixIcon: const Icon(Icons.storefront),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             filled: true,
@@ -310,7 +313,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   // ── Step 3: Avatar ────────────────────────────────────────────────
-  Widget _buildAvatarStep() {
+  Widget _buildAvatarStep(AppLocalizations l) {
     final user = FirebaseAuth.instance.currentUser;
     final hasPhoto = user?.photoURL != null && user!.photoURL!.isNotEmpty;
 
@@ -320,10 +323,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         // Current preview
         _buildCurrentPreview(user, hasPhoto),
         const SizedBox(height: 16),
-        const Text('Choose a profile icon', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(l.chooseProfileIcon, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Text(
-          hasPhoto ? 'Your Google/Facebook photo is already set. Pick an icon to change it.' : 'Pick an icon to represent your store',
+          hasPhoto ? l.pickIconHintWithPhoto : l.pickIconHint,
           style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
           textAlign: TextAlign.center,
         ),

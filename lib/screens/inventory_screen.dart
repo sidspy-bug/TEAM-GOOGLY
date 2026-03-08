@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../models/sale.dart';
 import '../repositories/sales_repository.dart';
 
@@ -48,6 +49,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return FutureBuilder<List<Sale>>(
       future: _productsFuture,
       builder: (context, snapshot) {
@@ -55,7 +57,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(child: Text('${l.error}: ${snapshot.error}'));
         }
         final products = snapshot.data ?? [];
         return SingleChildScrollView(
@@ -65,9 +67,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
             children: [
               Row(
                 children: [
-                  const Text('Inventory', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(l.inventory, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const Spacer(),
-                  Text('${products.length} products', style: TextStyle(color: Colors.grey.shade600)),
+                  Text('${products.length} ${l.productsLabel}', style: TextStyle(color: Colors.grey.shade600)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -76,17 +78,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
                     headingRowColor: WidgetStateProperty.all(Colors.indigo.shade50),
-                    columns: const [
-                      DataColumn(label: Text('ID', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Product', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Category', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Last Txn Date', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Units Sold', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
-                      DataColumn(label: Text('Current Stock', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
-                      DataColumn(label: Text('Sell Price (₹)', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
-                      DataColumn(label: Text('Cost Price (₹)', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
-                      DataColumn(label: Text('Revenue (₹)', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
-                      DataColumn(label: Text('Est. Profit (₹)', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                    columns: [
+                      DataColumn(label: Text(l.idLabel, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text(l.product, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text(l.category, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text(l.lastTxnDate, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text(l.unitsSold, style: const TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                      DataColumn(label: Text(l.currentStock, style: const TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                      DataColumn(label: Text(l.sellPrice, style: const TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                      DataColumn(label: Text(l.costPrice, style: const TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                      DataColumn(label: Text(l.revenueLabel, style: const TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                      DataColumn(label: Text(l.estimatedProfit, style: const TextStyle(fontWeight: FontWeight.bold)), numeric: true),
                     ],
                     rows: products.map((p) {
                       final clampedStock = p.currentStock < 0 ? 0 : p.currentStock;
