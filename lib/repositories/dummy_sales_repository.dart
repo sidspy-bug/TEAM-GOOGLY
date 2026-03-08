@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import '../models/sale.dart';
 import '../models/dashboard_summary.dart';
 import 'sales_repository.dart';
@@ -144,8 +145,7 @@ class DummySalesRepository implements SalesRepository {
         soldVsStock: soldVsStock,
       );
     } catch (e) {
-      // ignore: avoid_print
-      print('Error in getDashboardSummary: $e');
+      debugPrint('Error in getDashboardSummary: $e');
       rethrow;
     }
   }
