@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../models/sale.dart';
 import '../repositories/sales_repository.dart';
+import 'manual_entry_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   final SalesRepository salesRepository;
@@ -47,10 +48,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
   }
 
+  void _openAddProduct() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const ManualEntryScreen(mode: 'product'),
+      ),
+    );
+    // Refresh inventory after returning
+    setState(() => _loadProducts());
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return FutureBuilder<List<Sale>>(
+    return Stack(
+      children: [
+        FutureBuilder<List<Sale>>(
       future: _productsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -129,6 +142,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
         );
       },
+    ),
+    Positioned(
+      right: 16,
+      bottom: 16,
+      child: FloatingActionButton.extended(
+        onPressed: _openAddProduct,
+        icon: const Icon(Icons.add),
+        label: Text(l.addProduct),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+      ),
+    ),
+    ],
     );
   }
 }

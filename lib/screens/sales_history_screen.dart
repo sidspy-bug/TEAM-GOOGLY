@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../models/sale.dart';
 import '../repositories/sales_repository.dart';
+import 'manual_entry_screen.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final SalesRepository salesRepository;
@@ -42,9 +43,22 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     setState(() => _dateRange = null);
   }
 
+  void _openRecordSale() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const ManualEntryScreen(mode: 'sale'),
+      ),
+    );
+    // Refresh sales after returning
+    setState(() => _salesFuture = widget.salesRepository.getSales());
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Sale>>(
+    final l = AppLocalizations.of(context);
+    return Stack(
+      children: [
+        FutureBuilder<List<Sale>>(
       future: _salesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -207,6 +221,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           ),
         );
       },
+    ),
+    Positioned(
+      right: 16,
+      bottom: 16,
+      child: FloatingActionButton.extended(
+        onPressed: _openRecordSale,
+        icon: const Icon(Icons.add),
+        label: Text(l.recordSale),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+      ),
+    ),
+    ],
     );
   }
 }
