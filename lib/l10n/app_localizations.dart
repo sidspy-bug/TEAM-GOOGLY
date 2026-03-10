@@ -215,6 +215,22 @@ class AppLocalizations {
   String get aboutVersion => _t.aboutVersion;
   String get aboutDescription => _t.aboutDescription;
 
+  // ── Manual Entry ─────────────────────────────────────────────────────
+  String get addProduct => _t.addProduct;
+  String get recordSale => _t.recordSale;
+  String get productNameLabel => _t.productNameLabel;
+  String get sellingPriceLabel => _t.sellingPriceLabel;
+  String get initialStock => _t.initialStock;
+  String get selectProduct => _t.selectProduct;
+  String get transactionMode => _t.transactionMode;
+  String get productAddedSuccess => _t.productAddedSuccess;
+  String get saleRecordedSuccess => _t.saleRecordedSuccess;
+  String get fieldRequired => _t.fieldRequired;
+  String get enterValidNumber => _t.enterValidNumber;
+  String get noProductsAvailable => _t.noProductsAvailable;
+  String get addProductDesc => _t.addProductDesc;
+  String get recordSaleDesc => _t.recordSaleDesc;
+
   // ── Language names (shown in picker) ─────────────────────────────────
   String languageName(String code) {
     switch (code) {
@@ -422,6 +438,22 @@ abstract class _Strings {
   String get notSignedIn;
   String get aboutVersion;
   String get aboutDescription;
+
+  // Manual Entry
+  String get addProduct;
+  String get recordSale;
+  String get productNameLabel;
+  String get sellingPriceLabel;
+  String get initialStock;
+  String get selectProduct;
+  String get transactionMode;
+  String get productAddedSuccess;
+  String get saleRecordedSuccess;
+  String get fieldRequired;
+  String get enterValidNumber;
+  String get noProductsAvailable;
+  String get addProductDesc;
+  String get recordSaleDesc;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -589,6 +621,21 @@ class _En extends _Strings {
   @override String get notSignedIn => 'Not signed in';
   @override String get aboutVersion => 'GrowthOS v0.1.0';
   @override String get aboutDescription => 'AI-Powered Business Insights for Small Shop Owners.';
+
+  @override String get addProduct => 'Add Product';
+  @override String get recordSale => 'Record Sale';
+  @override String get productNameLabel => 'Product Name';
+  @override String get sellingPriceLabel => 'Selling Price (₹)';
+  @override String get initialStock => 'Initial Stock';
+  @override String get selectProduct => 'Select Product';
+  @override String get transactionMode => 'Transaction Mode';
+  @override String get productAddedSuccess => 'Product added successfully!';
+  @override String get saleRecordedSuccess => 'Sale recorded successfully!';
+  @override String get fieldRequired => 'This field is required';
+  @override String get enterValidNumber => 'Enter a valid number';
+  @override String get noProductsAvailable => 'No products available. Add products first.';
+  @override String get addProductDesc => 'Fill in the details below to add a new product to your inventory.';
+  @override String get recordSaleDesc => 'Select a product and enter sale details to record a transaction.';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -756,11 +803,22 @@ class _Hi extends _Strings {
   @override String get notSignedIn => 'साइन इन नहीं है';
   @override String get aboutVersion => 'GrowthOS v0.1.0';
   @override String get aboutDescription => 'छोटे दुकानदारों के लिए AI-संचालित व्यापार अंतर्दृष्टि।';
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tamil (தமிழ்)
-// ─────────────────────────────────────────────────────────────────────────────
+  @override String get addProduct => 'उत्पाद जोड़ें';
+  @override String get recordSale => 'बिक्री दर्ज करें';
+  @override String get productNameLabel => 'उत्पाद का नाम';
+  @override String get sellingPriceLabel => 'बिक्री मूल्य (₹)';
+  @override String get initialStock => 'प्रारंभिक स्टॉक';
+  @override String get selectProduct => 'उत्पाद चुनें';
+  @override String get transactionMode => 'भुगतान माध्यम';
+  @override String get productAddedSuccess => 'उत्पाद सफलतापूर्वक जोड़ा गया!';
+  @override String get saleRecordedSuccess => 'बिक्री सफलतापूर्वक दर्ज हुई!';
+  @override String get fieldRequired => 'यह फ़ील्ड आवश्यक है';
+  @override String get enterValidNumber => 'एक वैध संख्या दर्ज करें';
+  @override String get noProductsAvailable => 'कोई उत्पाद उपलब्ध नहीं है। पहले उत्पाद जोड़ें।';
+  @override String get addProductDesc => 'अपनी इन्वेंटरी में नया उत्पाद जोड़ने के लिए नीचे विवरण भरें।';
+  @override String get recordSaleDesc => 'लेनदेन दर्ज करने के लिए उत्पाद चुनें और बिक्री विवरण दर्ज करें।';
+}
 
 class _Ta extends _Strings {
   const _Ta();
@@ -923,6 +981,21 @@ class _Ta extends _Strings {
   @override String get notSignedIn => 'உள்நுழையவில்லை';
   @override String get aboutVersion => 'GrowthOS v0.1.0';
   @override String get aboutDescription => 'சிறு கடையாளர்களுக்கான AI-இயக்கப்படும் வணிக நுண்ணறிவு.';
+
+  @override String get addProduct => 'தயாரிப்பு சேர்';
+  @override String get recordSale => 'விற்பனை பதிவு செய்';
+  @override String get productNameLabel => 'தயாரிப்பு பெயர்';
+  @override String get sellingPriceLabel => 'விற்பனை விலை (₹)';
+  @override String get initialStock => 'ஆரம்ப சரக்கு';
+  @override String get selectProduct => 'தயாரிப்பு தேர்வு செய்க';
+  @override String get transactionMode => 'பரிவர்த்தனை முறை';
+  @override String get productAddedSuccess => 'தயாரிப்பு வெற்றிகரமாக சேர்க்கப்பட்டது!';
+  @override String get saleRecordedSuccess => 'விற்பனை வெற்றிகரமாக பதிவு செய்யப்பட்டது!';
+  @override String get fieldRequired => 'இந்தப் புலம் தேவை';
+  @override String get enterValidNumber => 'சரியான எண்ணை உள்ளிடவும்';
+  @override String get noProductsAvailable => 'தயாரிப்புகள் இல்லை. முதலில் தயாரிப்புகளைச் சேருங்கள்.';
+  @override String get addProductDesc => 'உங்கள் சரக்குக்கு புதிய தயாரிப்பு சேர்க்க கீழே விவரங்களை நிரப்பவும்.';
+  @override String get recordSaleDesc => 'பரிவர்த்தனை பதிவு செய்ய தயாரிப்பைத் தேர்ந்தெடுத்து விற்பனை விவரங்களை உள்ளிடவும்.';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1090,4 +1163,19 @@ class _Mr extends _Strings {
   @override String get notSignedIn => 'साइन इन केलेले नाही';
   @override String get aboutVersion => 'GrowthOS v0.1.0';
   @override String get aboutDescription => 'लहान दुकानदारांसाठी AI-चालित व्यवसाय अंतर्दृष्टी.';
+
+  @override String get addProduct => 'उत्पादन जोडा';
+  @override String get recordSale => 'विक्री नोंदवा';
+  @override String get productNameLabel => 'उत्पादनाचे नाव';
+  @override String get sellingPriceLabel => 'विक्री किंमत (₹)';
+  @override String get initialStock => 'प्रारंभिक साठा';
+  @override String get selectProduct => 'उत्पादन निवडा';
+  @override String get transactionMode => 'व्यवहार माध्यम';
+  @override String get productAddedSuccess => 'उत्पादन यशस्वीरित्या जोडले!';
+  @override String get saleRecordedSuccess => 'विक्री यशस्वीरित्या नोंदवली!';
+  @override String get fieldRequired => 'हे फील्ड आवश्यक आहे';
+  @override String get enterValidNumber => 'वैध संख्या प्रविष्ट करा';
+  @override String get noProductsAvailable => 'उत्पादने उपलब्ध नाहीत. प्रथम उत्पादने जोडा.';
+  @override String get addProductDesc => 'आपल्या यादीत नवीन उत्पादन जोडण्यासाठी खालील तपशील भरा.';
+  @override String get recordSaleDesc => 'व्यवहार नोंदवण्यासाठी उत्पादन निवडा आणि विक्री तपशील प्रविष्ट करा.';
 }
