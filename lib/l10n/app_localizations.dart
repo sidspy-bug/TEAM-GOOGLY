@@ -638,6 +638,10 @@ class _En extends _Strings {
   @override String get recordSaleDesc => 'Select a product and enter sale details to record a transaction.';
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Hindi (हिन्दी)
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _Hi extends _Strings {
   const _Hi();
 

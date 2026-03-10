@@ -364,7 +364,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
           validator: (v) {
             if (v == null || v.trim().isEmpty) return l.fieldRequired;
             final n = int.tryParse(v.trim());
-            if (n == null || n < 0) return l.enterValidNumber;
+            if (n == null || n <= 0) return l.enterValidNumber;
             return null;
           },
         ),
