@@ -58,11 +58,25 @@ db.exec(`
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
   );
 
+  -- Purchase history (Restocks)
+  CREATE TABLE IF NOT EXISTS purchases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    product_id INTEGER NOT NULL,
+    units_purchased INTEGER NOT NULL CHECK(units_purchased > 0),
+    cost_price REAL NOT NULL,
+    gst REAL DEFAULT 0,
+    purchase_date TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+  );
+
   -- Indexes for faster queries
   CREATE INDEX IF NOT EXISTS idx_products_user ON products(user_id);
   CREATE INDEX IF NOT EXISTS idx_inventory_user ON inventory(user_id);
   CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id);
   CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(transaction_date);
+  CREATE INDEX IF NOT EXISTS idx_purchases_user ON purchases(user_id);
+  CREATE INDEX IF NOT EXISTS idx_purchases_date ON purchases(purchase_date);
 `);
 
 console.log("✅ SQLite database initialized at:", dbPath);

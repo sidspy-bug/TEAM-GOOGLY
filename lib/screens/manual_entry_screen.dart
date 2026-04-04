@@ -7,7 +7,8 @@ import '../l10n/app_localizations.dart';
 class ManualEntryScreen extends StatefulWidget {
   /// 'product' to add/restock a product, 'sale' to record a sale.
   final String mode;
-  const ManualEntryScreen({super.key, required this.mode});
+  final VoidCallback? onSaveSuccess;
+  const ManualEntryScreen({super.key, required this.mode, this.onSaveSuccess});
 
   @override
   State<ManualEntryScreen> createState() => _ManualEntryScreenState();
@@ -151,14 +152,14 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
 
     ApiSalesRepository().clearCache();
     final l = AppLocalizations.of(context);
-    setState(() {
-      _successMsg = l.productAddedSuccess;
-      _nameCtrl.clear();
-      _costPriceCtrl.clear();
-      _sellingPriceCtrl.clear();
-      _stockCtrl.text = '1';
-      _category = 'General';
-    });
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.productAddedSuccess), backgroundColor: Colors.green),
+      );
+      Navigator.of(context).pop();
+      if (widget.onSaveSuccess != null) widget.onSaveSuccess!();
+    }
   }
 
   Future<void> _recordSale() async {
@@ -177,12 +178,14 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
 
     ApiSalesRepository().clearCache();
     final l = AppLocalizations.of(context);
-    setState(() {
-      _successMsg = l.saleRecordedSuccess;
-      _qtyCtrl.text = '1';
-      _selectedProductId = null;
-      _transactionMode = 'Cash';
-    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.saleRecordedSuccess), backgroundColor: Colors.green),
+      );
+      Navigator.of(context).pop();
+      if (widget.onSaveSuccess != null) widget.onSaveSuccess!();
+    }
   }
 
   @override

@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Backend
+backend/node_modules/
+backend/shop.db
+backend/shop.db-shm
+backend/shop.db-wal
+backend/serviceAccountKey.json
+backend/eng.traineddata
+*.traineddata

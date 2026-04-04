@@ -10,21 +10,17 @@
 
 const db = require("./db");
 
-const uid = process.env.SEED_UID
-  || (() => {
-    const row = db.prepare("SELECT uid FROM user_settings LIMIT 1").get();
-    return row ? row.uid : "seed-user";
-  })();
+const uids = db.prepare("SELECT uid FROM user_settings").all().map(r => r.uid);
+if (uids.length === 0) uids.push("seed-user");
 
-console.log(`🌱 Seeding data for UID: ${uid}`);
+console.log(`🌱 Seeding data for UIDs: ${uids.join(", ")}`);
 
-// Check if products already exist for this user
-const existingCount = db.prepare("SELECT COUNT(*) AS count FROM products WHERE user_id = ?").get(uid);
-if (existingCount.count > 0) {
-  console.log(`⚠️  User already has ${existingCount.count} product(s). Skipping seed to avoid duplicates.`);
-  console.log(`   To force re-seed, delete existing data first: DELETE FROM products WHERE user_id = '${uid}';`);
-  process.exit(0);
-}
+for (const uid of uids) {
+  // Force clear existing data for this user to ensure a fresh demo state
+  db.prepare("DELETE FROM transactions WHERE user_id = ?").run(uid);
+  db.prepare("DELETE FROM inventory WHERE user_id = ?").run(uid);
+  db.prepare("DELETE FROM products WHERE user_id = ?").run(uid);
+  console.log(`🧹 Cleared existing data for UID: ${uid}`);
 
 // ── Products: 15 diverse items across categories ────────────────────────
 const products = [
@@ -57,91 +53,108 @@ const products = [
 ];
 
 const insertProduct = db.prepare(
-  "INSERT INTO products (user_id, product_name, category, cost_price, selling_price) VALUES (?, ?, ?, ?, ?)"
+  "INSERT INTO products (user_id, product_name, category, cost_price, selling_price, created_at) VALUES (?, ?, ?, ?, ?, ?)"
 );
 const insertInventory = db.prepare(
-  "INSERT OR REPLACE INTO inventory (product_id, user_id, current_stock) VALUES (?, ?, ?)"
+  "INSERT OR REPLACE INTO inventory (product_id, user_id, current_stock, updated_at) VALUES (?, ?, ?, ?)"
 );
 
 const productIds = [];
 
 const seedProducts = db.transaction(() => {
   for (const p of products) {
-    const result = insertProduct.run(uid, p.name, p.category, p.cost, p.sell);
+    const daysAgo = Math.floor(Math.random() * 90); // Scatter purchase events over 90 days
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    date.setHours(Math.floor(Math.random() * 12) + 8);
+    const dateStr = date.toISOString().replace("T", " ").slice(0, 19);
+
+    const result = insertProduct.run(uid, p.name, p.category, p.cost, p.sell, dateStr);
     const id = result.lastInsertRowid;
     productIds.push(id);
-    insertInventory.run(id, uid, p.stock);
+    insertInventory.run(id, uid, 0, dateStr); // Start at 0!
   }
 });
 
 seedProducts();
-console.log(`✅ Inserted ${products.length} products with inventory`);
-
-// ── Transactions: 25 diverse entries over last 14 days ──────────────────
-const modes = ["UPI", "Cash", "Card"];
-const txns = [
-  // High sellers
-  { idx: 0, units: 8, mode: "UPI", daysAgo: 0 },   // Salt
-  { idx: 0, units: 5, mode: "Cash", daysAgo: 1 },
-  { idx: 1, units: 6, mode: "UPI", daysAgo: 0 },    // Sugar
-  { idx: 1, units: 4, mode: "Card", daysAgo: 2 },
-  { idx: 2, units: 3, mode: "Cash", daysAgo: 1 },   // Rice
-  { idx: 5, units: 10, mode: "UPI", daysAgo: 0 },   // Milk
-  { idx: 5, units: 8, mode: "Cash", daysAgo: 1 },
-  { idx: 6, units: 5, mode: "UPI", daysAgo: 0 },    // Tea
-  { idx: 6, units: 7, mode: "Cash", daysAgo: 3 },
-  { idx: 6, units: 4, mode: "UPI", daysAgo: 5 },
-  { idx: 7, units: 2, mode: "Card", daysAgo: 1 },   // Coffee
-  { idx: 8, units: 3, mode: "UPI", daysAgo: 2 },    // Mango Juice
-  { idx: 10, units: 6, mode: "Cash", daysAgo: 0 },   // Chips
-  { idx: 10, units: 4, mode: "UPI", daysAgo: 4 },
-  { idx: 11, units: 12, mode: "Cash", daysAgo: 0 },  // Maggi
-  { idx: 11, units: 8, mode: "UPI", daysAgo: 1 },
-  { idx: 11, units: 10, mode: "Cash", daysAgo: 3 },
-  { idx: 12, units: 3, mode: "Card", daysAgo: 2 },   // Soap
-  { idx: 14, units: 4, mode: "Cash", daysAgo: 1 },   // Notebook
-  { idx: 14, units: 2, mode: "UPI", daysAgo: 6 },
-  // Low sellers
-  { idx: 3, units: 1, mode: "Cash", daysAgo: 5 },   // Cooking Oil
-  { idx: 4, units: 1, mode: "UPI", daysAgo: 7 },    // Butter
-  { idx: 9, units: 5, mode: "Cash", daysAgo: 0 },   // Samosa (high qty)
-  { idx: 13, units: 1, mode: "Card", daysAgo: 10 },  // Shampoo
-  { idx: 7, units: 3, mode: "UPI", daysAgo: 8 },    // Coffee again
-];
+console.log(`✅ Inserted ${products.length} products`);
 
 const insertTxn = db.prepare(
   "INSERT INTO transactions (user_id, product_id, units_sold, transaction_mode, revenue, profit, transaction_date) VALUES (?, ?, ?, ?, ?, ?, ?)"
+);
+const insertPurchase = db.prepare(
+  "INSERT INTO purchases (user_id, product_id, units_purchased, cost_price, gst, purchase_date) VALUES (?, ?, ?, ?, ?, ?)"
+);
+const addStock = db.prepare(
+  "UPDATE inventory SET current_stock = current_stock + ?, updated_at = datetime('now') WHERE product_id = ?"
 );
 const decrementStock = db.prepare(
   "UPDATE inventory SET current_stock = MAX(current_stock - ?, 0), updated_at = datetime('now') WHERE product_id = ?"
 );
 
-const seedTxns = db.transaction(() => {
-  for (const t of txns) {
-    const productId = productIds[t.idx];
-    const product = products[t.idx];
-    const revenue = t.units * product.sell;
-    const profit = t.units * (product.sell - product.cost);
-    const date = new Date();
-    date.setDate(date.getDate() - t.daysAgo);
-    date.setHours(Math.floor(Math.random() * 12) + 8); // 8am-8pm
-    const dateStr = date.toISOString().replace("T", " ").slice(0, 19);
+let txnCounter = 0;
+let purchaseCounter = 0;
 
-    insertTxn.run(uid, productId, t.units, t.mode, revenue, profit, dateStr);
-    decrementStock.run(t.units, productId);
+const seedEvents = db.transaction(() => {
+  const currentStocks = new Array(products.length).fill(0);
+
+  // Loop precisely from 90 days ago (-90) up to today (0)
+  for (let daysAgo = 90; daysAgo >= 0; daysAgo--) {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    
+    // 1. Restock Check: Buy Inventory if Low!
+    for (let i = 0; i < products.length; i++) {
+       if (currentStocks[i] < 10) {
+          const refillQty = Math.floor(Math.random() * 50) + 30; // buy 30-80 units
+          const gst = (products[i].cost * 0.05).toFixed(2); // 5% GST example
+          
+          date.setHours(9); // 9am morning restocks
+          const pDateStr = date.toISOString().replace("T", " ").slice(0, 19);
+
+          insertPurchase.run(uid, productIds[i], refillQty, products[i].cost, gst, pDateStr);
+          addStock.run(refillQty, productIds[i]);
+          currentStocks[i] += refillQty;
+          purchaseCounter++;
+       }
+    }
+
+    // 2. Generate random sales (0 to 4 txns per day)
+    const txnsToday = Math.floor(Math.random() * 5); 
+    for (let i = 0; i < txnsToday; i++) {
+      let pIdx = Math.floor(Math.random() * products.length);
+      if (Math.random() > 0.5) pIdx = Math.floor(Math.random() * 4); 
+      
+      const units = Math.floor(Math.random() * 3) + 1;
+      if (currentStocks[pIdx] >= units) {
+         const product = products[pIdx];
+         const mode = ["UPI", "Cash", "Card"][Math.floor(Math.random() * 3)];
+         const revenue = units * product.sell;
+         const profit = units * (product.sell - product.cost);
+
+         date.setHours(Math.floor(Math.random() * 10) + 10); // 10am-8pm window
+         const tDateStr = date.toISOString().replace("T", " ").slice(0, 19);
+
+         insertTxn.run(uid, productIds[pIdx], units, mode, revenue, profit, tDateStr);
+         decrementStock.run(units, productIds[pIdx]);
+         currentStocks[pIdx] -= units;
+         txnCounter++;
+      }
+    }
   }
 });
 
-seedTxns();
-console.log(`✅ Inserted ${txns.length} transactions`);
+seedEvents();
+console.log(`✅ Inserted ${purchaseCounter} explicit historical Purchases natively supporting ${txnCounter} Sales`);
 
 // Ensure user_settings row exists
-const userRow = db.prepare("SELECT uid FROM user_settings WHERE uid = ?").get(uid);
-if (!userRow) {
-  db.prepare(
-    "INSERT INTO user_settings (uid, shop_name, onboarded) VALUES (?, 'Seed Demo Shop', 1)"
-  ).run(uid);
-  console.log(`✅ Created user_settings for ${uid}`);
-}
+  const userRow = db.prepare("SELECT uid FROM user_settings WHERE uid = ?").get(uid);
+  if (!userRow) {
+    db.prepare(
+      "INSERT INTO user_settings (uid, shop_name, onboarded) VALUES (?, 'Seed Demo Shop', 1)"
+    ).run(uid);
+    console.log(`✅ Created user_settings for ${uid}`);
+  }
+} // Close for-of loop
 
-console.log("🎉 Seed complete!");
+console.log("🎉 All seeds complete!");

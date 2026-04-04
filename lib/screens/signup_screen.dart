@@ -12,6 +12,7 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
@@ -118,11 +119,11 @@ class _SignupScreenState extends State<SignupScreen> {
                 children: [
                   Icon(Icons.storefront, size: 64, color: Colors.indigo.shade400),
                   const SizedBox(height: 12),
-                  Text(l.createAccount, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                  Text(l.createAccount, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: isDark ? Colors.indigo.shade200 : Colors.indigo)),
                   const SizedBox(height: 4),
-                  Text('Powered by GrowthOS', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)), // brand name – intentionally kept in English
+                  Text('Powered by GrowthOS', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500, fontSize: 12)),
                   const SizedBox(height: 4),
-                  Text(l.joinGrowthOS, style: TextStyle(color: Colors.grey.shade600)),
+                  Text(l.joinGrowthOS, style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600)),
                   const SizedBox(height: 32),
 
                   TextFormField(
@@ -179,12 +180,12 @@ class _SignupScreenState extends State<SignupScreen> {
                   // Divider
                   Row(
                     children: [
-                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                      Expanded(child: Divider(color: isDark ? const Color(0xFF475569) : Colors.grey.shade300)),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(l.orSignUpWith, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                        child: Text(l.orSignUpWith, style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500)),
                       ),
-                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                      Expanded(child: Divider(color: isDark ? const Color(0xFF475569) : Colors.grey.shade300)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -200,7 +201,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           : const Icon(Icons.g_mobiledata, size: 24, color: Colors.red),
                       label: Text(l.continueWithGoogle),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.grey.shade300),
+                        side: BorderSide(color: isDark ? const Color(0xFF475569) : Colors.grey.shade300),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
@@ -218,7 +219,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           : const Icon(Icons.facebook, size: 22, color: Color(0xFF1877F2)),
                       label: Text(l.continueWithFacebook),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.grey.shade300),
+                        side: BorderSide(color: isDark ? const Color(0xFF475569) : Colors.grey.shade300),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),

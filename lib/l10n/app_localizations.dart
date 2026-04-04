@@ -483,7 +483,7 @@ class _En extends _Strings {
 
   @override String get navDashboard => 'Dashboard';
   @override String get navInventory => 'Inventory';
-  @override String get navSalesHistory => 'Sales History';
+  @override String get navSalesHistory => 'History';
   @override String get navSettings => 'Settings';
 
   @override String get loginTitle => 'Sign in to your account';

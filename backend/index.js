@@ -181,15 +181,26 @@ app.delete("/products/delete/:id", verifyToken, (req, res) => {
    INVENTORY MODULE
 ===================== */
 
-// ➕ Add / Update Stock
+// ➕ Add / Update Stock (and log as a Purchase)
 app.post("/inventory/add", verifyToken, (req, res) => {
   try {
-    const { productId, stockAdded } = req.body;
+    const { productId, stockAdded, gst = 0 } = req.body;
 
     if (!productId || stockAdded <= 0) {
       return res.status(400).json({ error: "Invalid productId or stockAdded" });
     }
 
+    const product = db.prepare("SELECT cost_price FROM products WHERE id = ? AND user_id = ?").get(productId, req.user.uid);
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    // 1. Log purchase
+    db.prepare(
+      "INSERT INTO purchases (user_id, product_id, units_purchased, cost_price, gst) VALUES (?, ?, ?, ?, ?)"
+    ).run(req.user.uid, productId, stockAdded, product.cost_price, gst);
+
+    // 2. Update inventory
     const existing = db.prepare("SELECT current_stock FROM inventory WHERE product_id = ?").get(productId);
 
     if (!existing) {
@@ -202,11 +213,25 @@ app.post("/inventory/add", verifyToken, (req, res) => {
       ).run(stockAdded, productId);
     }
 
-    res.json({ message: "Stock updated successfully ✅" });
+    res.json({ message: "Stock updated securely mapped to Purchases ✅" });
   } catch (err) {
     console.error("Stock update error:", err);
     res.status(500).json({ error: "Stock update failed" });
   }
+});
+
+// 📜 Purchase History
+app.get("/purchases/history", verifyToken, (req, res) => {
+  const history = db.prepare(`
+    SELECT pur.id, pur.product_id AS productId, pur.units_purchased AS quantity, 
+           pur.cost_price AS costPrice, pur.gst, pur.purchase_date AS purchaseDate,
+           p.product_name AS productName, p.category, p.selling_price AS sellingPrice
+    FROM purchases pur
+    JOIN products p ON p.id = pur.product_id
+    WHERE pur.user_id = ?
+    ORDER BY pur.purchase_date DESC
+  `).all(req.user.uid);
+  res.json(history);
 });
 
 // 📦 Inventory Status
@@ -500,7 +525,7 @@ function getRuleBasedResponse(message, context) {
 // POST /ai/chat — Ollama-powered chat with fallback
 app.post("/ai/chat", verifyToken, async (req, res) => {
   const uid = req.user.uid;
-  const { message } = req.body;
+  const { message, history } = req.body;
 
   if (!message || !message.trim()) {
     return res.status(400).json({ error: "Message is required" });
@@ -508,19 +533,75 @@ app.post("/ai/chat", verifyToken, async (req, res) => {
 
   const context = getShopContext(uid);
 
+  // Format history
+  const historyText = Array.isArray(history) && history.length > 0 
+    ? `\nChat History:\n${history.join('\n')}\n`
+    : '';
+
   // Try Ollama first
   try {
-    const shopDataPrompt = `You are a helpful business assistant for a small Indian retail shop. Here is the shop data:
+    const shopDataPrompt = `You are an expert retail business advisor for small shopkeepers.
+
+Your role is to analyze shop data and answer business questions in a practical, profit-focused way.
+
+You must support TWO MODES:
+
+----------------------------------------
+MODE 1: AUTO INSIGHTS (no user question)
+----------------------------------------
+
+If no user question is provided, generate structured business insights.
+
+STRICT OUTPUT FORMAT:
+
+🔴 Problem:
+Identify one critical issue hurting the business (use specific product names, stock levels, or sales data).
+
+🟢 Opportunity:
+Identify one clear opportunity to increase revenue or profit (based on actual data trends).
+
+💡 Action:
+Give one clear, practical action the shopkeeper should take immediately.
+
+RULES:
+- Use real numbers and product names
+- Avoid generic advice
+- Keep it short and clear
+- Focus on profit, stock, and sales improvement
+
+----------------------------------------
+MODE 2: BUSINESS ASSISTANT (user question present)
+----------------------------------------
+
+If a user question is provided, answer it directly.
+
+RULES:
+- CRITICAL: NEVER hallucinate, invent, or create dummy data. 
+- You MUST securely and EXCLUSIVELY use the arrays and digits under the "DATA CONTEXT" below.
+- If the shop has "No sales yet" or "None", you must truthfully report that data doesn't exist yet instead of making up hypothetical metrics.
+- Be simple and practical (shopkeeper-friendly language)
+- Give actionable advice
+- Keep response concise (3–5 lines max)
+- Avoid technical or complex explanations
+
+----------------------------------------
+DATA CONTEXT:
+----------------------------------------
+
+Shop Data:
 - Total Revenue: ₹${context.totalRevenue.toFixed(0)}
 - Total Profit: ₹${context.totalProfit.toFixed(0)}
 - Total Units Sold: ${context.totalUnitsSold}
 - Total Products: ${context.totalProducts}
 - Top Products: ${context.topProducts.join(', ') || 'No sales yet'}
 - Low Stock Items: ${context.lowStockItems.join(', ') || 'None'}
+${historyText}
+----------------------------------------
+INPUT:
+----------------------------------------
 
-User question: ${message}
-
-Give a concise, actionable response in 2-3 sentences. Focus on practical advice. Use ₹ for currency.`;
+User Question:
+${message}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
@@ -572,12 +653,21 @@ app.post("/ai/insights", verifyToken, async (req, res) => {
 - Top Products: ${context.topProducts.join(', ') || 'No sales yet'}
 - Low Stock Items: ${context.lowStockItems.join(', ') || 'None'}
 
-Format as:
-1. Top selling product insight
-2. Low stock alert or inventory suggestion
-3. One improvement suggestion
+STRICT OUTPUT FORMAT:
+🔴 Problem:
+[identify one critical issue]
 
-Keep each insight to 1 sentence. Use ₹ for currency.`;
+🟢 Opportunity:
+[identify one clear opportunity to increase revenue or profit]
+
+💡 Action:
+[give one practical action]
+
+RULES:
+- Use real numbers and product names
+- Keep it short and clear
+- Focus on profit, stock, and sales improvement
+- Use ₹ for currency.`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
@@ -607,8 +697,15 @@ Keep each insight to 1 sentence. Use ₹ for currency.`;
     console.warn(`⚠️ Ollama insights fallback: ${err.message}`);
   }
 
-  // Fallback
-  const fallbackInsight = getRuleBasedResponse('give insights', context);
+  const fallbackInsight = `🔴 Problem:
+${context.lowStockItems.length > 0 ? context.lowStockItems[0] + ' is critically low on stock.' : 'No major problems detected, but sales volume could be optimized.'}
+
+🟢 Opportunity:
+${context.topProducts.length > 0 ? context.topProducts[0] + ' is your best seller, consider promoting it more or bundling it.' : 'Start bundles to increase average order value.'}
+
+💡 Action:
+Review your pricing and reorder fast-moving items immediately.`;
+
   res.json({ insight: fallbackInsight, source: 'rule-based' });
 });
 

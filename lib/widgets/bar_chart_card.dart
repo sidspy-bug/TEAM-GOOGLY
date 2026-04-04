@@ -9,7 +9,11 @@ class BarChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     try {
-      final entries = soldVsStock.entries.toList();
+      var entries = soldVsStock.entries.toList()
+        ..sort((a, b) => (b.value['sold'] ?? 0).compareTo(a.value['sold'] ?? 0));
+      if (entries.length > 10) {
+        entries = entries.take(10).toList();
+      }
 
       if (entries.isEmpty) {
         return Card(
@@ -55,59 +59,65 @@ class BarChartCard extends StatelessWidget {
 
       return Card(
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Text('Sold vs Stock', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const Text('Sold vs Stock', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const Spacer(),
                   _legend(Colors.blue, 'Sold'),
                   const SizedBox(width: 12),
                   _legend(Colors.orange, 'Stock'),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               SizedBox(
                 height: 280,
-                child: BarChart(
-                  BarChartData(
-                    maxY: ceilMax,
-                    minY: 0,
-                    barGroups: groups,
-                    titlesData: FlTitlesData(
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 32,
-                          getTitlesWidget: (v, meta) {
-                            final idx = v.toInt();
-                            if (idx < 0 || idx >= entries.length) return const SizedBox.shrink();
-                            final name = entries[idx].key;
-                            return SideTitleWidget(
-                              axisSide: meta.axisSide,
-                              child: Text(name.length > 7 ? '${name.substring(0, 6)}..' : name, style: const TextStyle(fontSize: 9)),
-                            );
-                          },
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: entries.length * 60.0 + 40.0, // Fixed width per bar group
+                    child: BarChart(
+                      BarChartData(
+                        maxY: ceilMax,
+                        minY: 0,
+                        barGroups: groups,
+                        titlesData: FlTitlesData(
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 32,
+                              getTitlesWidget: (v, meta) {
+                                final idx = v.toInt();
+                                if (idx < 0 || idx >= entries.length) return const SizedBox.shrink();
+                                final name = entries[idx].key;
+                                return SideTitleWidget(
+                                  axisSide: meta.axisSide,
+                                  child: Text(name.length > 7 ? '${name.substring(0, 6)}..' : name, style: const TextStyle(fontSize: 9)),
+                                );
+                              },
+                            ),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 42,
+                              interval: interval,
+                              getTitlesWidget: (v, meta) {
+                                if (v == meta.max) return const SizedBox.shrink();
+                                return Text(v.toInt().toString(), style: const TextStyle(fontSize: 10));
+                              },
+                            ),
+                          ),
                         ),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 42,
-                          interval: interval,
-                          getTitlesWidget: (v, meta) {
-                            if (v == meta.max) return const SizedBox.shrink();
-                            return Text(v.toInt().toString(), style: const TextStyle(fontSize: 10));
-                          },
-                        ),
+                        gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: interval),
+                        borderData: FlBorderData(show: true, border: const Border(left: BorderSide(), bottom: BorderSide())),
                       ),
                     ),
-                    gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: interval),
-                    borderData: FlBorderData(show: true, border: const Border(left: BorderSide(), bottom: BorderSide())),
                   ),
                 ),
               ),

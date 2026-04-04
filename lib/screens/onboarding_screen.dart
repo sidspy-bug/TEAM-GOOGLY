@@ -14,6 +14,7 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
   final _nameCtrl = TextEditingController();
   final _shopCtrl = TextEditingController();
   int _selectedAvatar = -1; // -1 = use existing / none
@@ -123,7 +124,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
       body: Center(
         child: SingleChildScrollView(
           child: Container(
@@ -137,7 +137,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const SizedBox(height: 8),
                 Text(l.appName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.indigo)),
                 const SizedBox(height: 4),
-                Text(l.letsSetupStore, style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+                Text(l.letsSetupStore, style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600, fontSize: 14)),
                 const SizedBox(height: 24),
 
                 // Step indicators
@@ -196,7 +196,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       setState(() => _selectedAvatar = -1);
                       _finish();
                     },
-                    child: Text(l.skipForNow, style: TextStyle(color: Colors.grey.shade500)),
+                    child: Text(l.skipForNow, style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500)),
                   ),
               ],
             ),
@@ -229,20 +229,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           height: 34,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: done ? Colors.green : (active ? Colors.indigo : Colors.grey.shade200),
+            color: done ? Colors.green : (active ? Colors.indigo : (isDark ? const Color(0xFF334155) : Colors.grey.shade200)),
             border: Border.all(
-              color: done ? Colors.green : (active ? Colors.indigo : Colors.grey.shade300),
+              color: done ? Colors.green : (active ? Colors.indigo : (isDark ? const Color(0xFF475569) : Colors.grey.shade300)),
               width: 2,
             ),
           ),
           child: Center(
             child: done
                 ? const Icon(Icons.check, size: 16, color: Colors.white)
-                : Text('${index + 1}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: active ? Colors.white : Colors.grey.shade500)),
+                : Text('${index + 1}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: active ? Colors.white : (isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500))),
           ),
         ),
         const SizedBox(height: 4),
-        Text(label, style: TextStyle(fontSize: 10, color: active ? Colors.indigo : Colors.grey.shade500, fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
+        Text(label, style: TextStyle(fontSize: 10, color: active ? Colors.indigo : (isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500), fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
       ],
     );
   }
@@ -253,7 +253,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       width: 50,
       height: 2,
       margin: const EdgeInsets.only(bottom: 18),
-      color: done ? Colors.green.shade300 : Colors.grey.shade300,
+      color: done ? Colors.green.shade300 : (isDark ? const Color(0xFF475569) : Colors.grey.shade300),
     );
   }
 
@@ -266,7 +266,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         const SizedBox(height: 16),
         Text(l.whatsYourName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Text(l.nameDisplayedProfile, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+        Text(l.nameDisplayedProfile, style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600, fontSize: 13)),
         const SizedBox(height: 24),
         TextField(
           controller: _nameCtrl,
@@ -276,7 +276,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             prefixIcon: const Icon(Icons.person),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             filled: true,
-            fillColor: Colors.grey.shade50,
+            fillColor: isDark ? const Color(0xFF334155) : Colors.grey.shade50,
           ),
           onSubmitted: (_) => _next(),
         ),
@@ -293,7 +293,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         const SizedBox(height: 16),
         Text(l.nameYourShop, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Text(l.shopNameDisplayed, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+        Text(l.shopNameDisplayed, style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600, fontSize: 13)),
         const SizedBox(height: 24),
         TextField(
           controller: _shopCtrl,
@@ -303,7 +303,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             prefixIcon: const Icon(Icons.storefront),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             filled: true,
-            fillColor: Colors.grey.shade50,
+            fillColor: isDark ? const Color(0xFF334155) : Colors.grey.shade50,
             hintText: 'e.g. Kumar General Store',
           ),
           onSubmitted: (_) => _next(),
@@ -327,7 +327,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         const SizedBox(height: 8),
         Text(
           hasPhoto ? l.pickIconHintWithPhoto : l.pickIconHint,
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+          style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600, fontSize: 13),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 20),

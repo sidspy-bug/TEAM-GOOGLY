@@ -6,7 +6,8 @@ import 'manual_entry_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   final SalesRepository salesRepository;
-  const InventoryScreen({super.key, required this.salesRepository});
+  final VoidCallback? onSaveSuccess;
+  const InventoryScreen({super.key, required this.salesRepository, this.onSaveSuccess});
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -51,7 +52,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
   void _openAddProduct() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const ManualEntryScreen(mode: 'product'),
+        builder: (_) => ManualEntryScreen(
+          mode: 'product',
+          onSaveSuccess: widget.onSaveSuccess,
+        ),
       ),
     );
     // Refresh inventory after returning

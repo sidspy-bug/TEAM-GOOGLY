@@ -5,7 +5,8 @@ import 'ai_assistant_panel.dart';
 /// Floating AI Assistant button + bottom sheet modal.
 /// Shows a FAB at bottom-right that opens a chat modal.
 class FloatingAiAssistant extends StatelessWidget {
-  const FloatingAiAssistant({super.key});
+  final VoidCallback? onSaveSuccess;
+  const FloatingAiAssistant({super.key, this.onSaveSuccess});
 
   void _showAddMenu(BuildContext context) {
     showModalBottomSheet(
@@ -33,7 +34,7 @@ class FloatingAiAssistant extends StatelessWidget {
                   label: const Text('Purchase'),
                   onPressed: () {
                     Navigator.of(context).pop();
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OcrScreen(mode: 'purchase')));
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => OcrScreen(mode: 'purchase', onSaveSuccess: onSaveSuccess)));
                   },
                 ),
                 ElevatedButton.icon(
@@ -46,7 +47,7 @@ class FloatingAiAssistant extends StatelessWidget {
                   label: const Text('Sale'),
                   onPressed: () {
                     Navigator.of(context).pop();
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OcrScreen(mode: 'sale')));
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => OcrScreen(mode: 'sale', onSaveSuccess: onSaveSuccess)));
                   },
                 ),
               ],

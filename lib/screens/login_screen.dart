@@ -15,6 +15,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
@@ -230,11 +231,11 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 Icon(Icons.storefront, size: 64, color: Colors.indigo.shade400),
                 const SizedBox(height: 12),
-                Text(l.appName, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                Text(l.appName, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: isDark ? Colors.indigo.shade200 : Colors.indigo)),
                 const SizedBox(height: 4),
-                Text('Powered by GrowthOS', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                Text('Powered by GrowthOS', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500, fontSize: 12)),
                 const SizedBox(height: 4),
-                Text(l.loginTitle, style: TextStyle(color: Colors.grey.shade600)),
+                Text(l.loginTitle, style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600)),
                 const SizedBox(height: 32),
 
                 // Toggle email / phone
@@ -282,7 +283,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: (_canLogin && !_emailLoading) ? _login : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.indigo,
-                              disabledBackgroundColor: Colors.indigo.shade200,
+                              disabledBackgroundColor: isDark ? Colors.indigo.shade900 : Colors.indigo.shade200,
                             ),
                             child: _emailLoading
                                 ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
@@ -298,7 +299,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 builder: (_) => const ForgotPasswordScreen(),
                               ));
                             },
-                            child: Text(l.forgotPassword, style: TextStyle(color: Colors.indigo.shade400, fontSize: 13)),
+                            child: Text(l.forgotPassword, style: TextStyle(color: isDark ? Colors.indigo.shade300 : Colors.indigo.shade400, fontSize: 13)),
                           ),
                         ),
                       ],
@@ -350,12 +351,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Divider
                 Row(
                   children: [
-                    Expanded(child: Divider(color: Colors.grey.shade300)),
+                    Expanded(child: Divider(color: isDark ? const Color(0xFF475569) : Colors.grey.shade300)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(l.orContinueWith, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                      child: Text(l.orContinueWith, style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500)),
                     ),
-                    Expanded(child: Divider(color: Colors.grey.shade300)),
+                    Expanded(child: Divider(color: isDark ? const Color(0xFF475569) : Colors.grey.shade300)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -371,7 +372,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         : const Icon(Icons.g_mobiledata, size: 24, color: Colors.red),
                     label: Text(l.continueWithGoogle),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.grey.shade300),
+                      side: BorderSide(color: isDark ? const Color(0xFF475569) : Colors.grey.shade300),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
@@ -389,7 +390,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         : const Icon(Icons.facebook, size: 22, color: Color(0xFF1877F2)),
                     label: Text(l.continueWithFacebook),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.grey.shade300),
+                      side: BorderSide(color: isDark ? const Color(0xFF475569) : Colors.grey.shade300),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),

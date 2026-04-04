@@ -39,7 +39,8 @@ class ParsedProduct {
 /// OCR Screen — scan an image, extract & parse products, save to inventory.
 class OcrScreen extends StatefulWidget {
   final String mode; // 'purchase' or 'sale'
-  const OcrScreen({super.key, this.mode = 'purchase'});
+  final VoidCallback? onSaveSuccess;
+  const OcrScreen({super.key, this.mode = 'purchase', this.onSaveSuccess});
   @override
   State<OcrScreen> createState() => _OcrScreenState();
 }
@@ -243,13 +244,20 @@ class _OcrScreenState extends State<OcrScreen> {
         _errorMessages.addAll(notFoundNames);
       }
       _errorMessages.addAll(errs);
-
-      _successMsg = saved > 0
-          ? (isPurchaseMode
-              ? 'Saved $saved product(s) to inventory!'
-              : 'Saved $saved sale transaction(s)!')
-          : null;
     });
+
+    if (saved > 0) {
+      if (mounted) {
+        final msg = isPurchaseMode
+            ? 'Saved $saved product(s) to inventory!'
+            : 'Saved $saved sale transaction(s)!';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: Colors.green),
+        );
+        Navigator.of(context).pop();
+        if (widget.onSaveSuccess != null) widget.onSaveSuccess!();
+      }
+    }
   }
 
   double _toDouble(dynamic v) {

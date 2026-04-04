@@ -90,15 +90,41 @@ class AiInsightsCard extends StatelessWidget {
             FutureBuilder<Map<String, String>?>(
               future: salesRepository.getAiInsight(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done || snapshot.data == null) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snapshot.data == null || snapshot.data!['insight'] == null) {
                   return const SizedBox.shrink();
                 }
-                final data = snapshot.data!;
-                return _insightRow(
-                  Icons.lightbulb_outline,
-                  Colors.indigo.shade400,
-                  '💡 ${data['insight'] ?? ''} — ${data['reason'] ?? ''}. Action: ${data['action'] ?? ''}',
-                  isDark,
+                
+                final fullInsight = snapshot.data!['insight']!;
+                
+                // Parse structured layout:
+                String problem = '', opportunity = '', action = '';
+                
+                final RegExp emojiClearer = RegExp(r'[🔴🟢💡⚠️📉📈🏆💰🚨✅]');
+
+                if (fullInsight.contains('🔴') || fullInsight.contains('🟢')) {
+                   final splits = fullInsight.split(RegExp(r'(?=🔴|🟢|💡)'));
+                   for (var s in splits) {
+                     if (s.startsWith('🔴')) problem = s.replaceFirst(RegExp(r'🔴\s*Problem:?'), '').replaceAll(emojiClearer, '').trim();
+                     if (s.startsWith('🟢')) opportunity = s.replaceFirst(RegExp(r'🟢\s*Opportunity:?'), '').replaceAll(emojiClearer, '').trim();
+                     if (s.startsWith('💡')) action = s.replaceFirst(RegExp(r'💡\s*Action:?'), '').replaceAll(emojiClearer, '').trim();
+                   }
+                } else {
+                   problem = fullInsight.replaceAll(emojiClearer, '').trim(); // Fallback if unstructured
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (problem.isNotEmpty) _buildInsightBlock('🔴 Problem', problem, Colors.red.shade400, isDark),
+                    if (opportunity.isNotEmpty) _buildInsightBlock('🟢 Opportunity', opportunity, Colors.green.shade400, isDark),
+                    if (action.isNotEmpty) _buildInsightBlock('💡 Action', action, Colors.blue.shade400, isDark),
+                  ],
                 );
               },
             ),
@@ -178,6 +204,41 @@ class AiInsightsCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInsightBlock(String title, String content, Color accentColor, bool isDark) {
+    if (content.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : accentColor.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: accentColor,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            content,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -35,8 +35,6 @@ class TodayFocusCard extends StatelessWidget {
             const SizedBox(height: 10),
             _row(Icons.warning_amber, Colors.red.shade400, '$lowStockCount items are low on stock — reorder soon', isDark),
             const SizedBox(height: 6),
-            _row(Icons.star, Colors.indigo.shade400, 'Top seller today: $topProduct', isDark),
-            const SizedBox(height: 6),
             _row(Icons.trending_up, Colors.green.shade400, 'Estimated profit so far: ₹${estimatedProfit.toStringAsFixed(0)}', isDark),
           ],
         ),

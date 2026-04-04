@@ -8,6 +8,7 @@ import '../widgets/bar_chart_card.dart';
 import '../widgets/top_products_table.dart';
 import '../widgets/ai_insights_card.dart';
 import '../widgets/today_focus_card.dart';
+import '../widgets/revenue_trend_card.dart';
 
 class DashboardScreen extends StatefulWidget {
   final SalesRepository salesRepository;
@@ -22,10 +23,10 @@ class DashboardScreen extends StatefulWidget {
   });
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  State<DashboardScreen> createState() => DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class DashboardScreenState extends State<DashboardScreen> {
   late Future<DashboardSummary> _summaryFuture;
   late bool _isPremium;
 
@@ -42,6 +43,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (oldWidget.isPremiumUser != widget.isPremiumUser) {
       setState(() {
         _isPremium = widget.isPremiumUser;
+      });
+    }
+  }
+
+  /// Public method to trigger a data refresh from parent shell
+  void refresh() {
+    if (mounted) {
+      setState(() {
+        _summaryFuture = widget.salesRepository.getDashboardSummary();
       });
     }
   }
@@ -117,12 +127,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   topProduct: topProductName,
                   estimatedProfit: summary.estimatedProfit,
                   salesRepository: widget.salesRepository,
-                )
-              else
-                TodayFocusCard(
-                  lowStockCount: summary.lowStockCount,
-                  topProduct: topProductName,
-                  estimatedProfit: summary.estimatedProfit,
                 ),
               const SizedBox(height: 14),
 
@@ -136,12 +140,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: LineChartCard(
+                      child: RevenueTrendCard(
                         salesOverTime: summary.salesOverTime,
                         costOverTime: summary.costOverTime,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: BarChartCard(soldVsStock: summary.soldVsStock),
                     ),
@@ -150,11 +154,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               else
                 Column(
                   children: [
-                    LineChartCard(
+                    RevenueTrendCard(
                       salesOverTime: summary.salesOverTime,
                       costOverTime: summary.costOverTime,
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 14),
                     BarChartCard(soldVsStock: summary.soldVsStock),
                   ],
                 ),
@@ -172,20 +176,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _showCardDetails(int index, DashboardSummary summary) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
+        final double h = MediaQuery.of(ctx).size.height * 0.55;
         switch (index) {
           case 0:
-            return SizedBox(height: 350, child: LineChartCard(salesOverTime: summary.salesOverTime, costOverTime: summary.costOverTime));
+            return SizedBox(height: h, child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+              child: LineChartCard(
+                salesOverTime: summary.salesOverTime, 
+                costOverTime: summary.costOverTime,
+                showSalesOnly: true,
+                title: 'Total Sales Detail',
+              ),
+            ));
           case 1:
-            return SizedBox(height: 350, child: LineChartCard(salesOverTime: summary.salesOverTime, costOverTime: summary.costOverTime));
+            return SizedBox(height: h, child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+              child: LineChartCard(
+                salesOverTime: summary.salesOverTime, 
+                costOverTime: summary.costOverTime,
+                showProfitOnly: true,
+                title: 'Estimated Profit Detail',
+              ),
+            ));
           case 2:
-            final lowStock = summary.allProducts.where((p) => p.currentStock < 10).toList();
-            return Padding(
+            final lowStock = summary.lowProducts;
+            return SizedBox(height: h, child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const SizedBox(height: 8),
                 Text(AppLocalizations.of(ctx).lowStockProducts, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Expanded(
@@ -195,30 +218,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
                       title: Text(lowStock[i].productName),
                       subtitle: Text('${AppLocalizations.of(ctx).stockLabel}: ${lowStock[i].currentStock}'),
+                      trailing: const Text('Reorder soon', style: TextStyle(color: Colors.orange, fontSize: 12)),
                     ),
                   ),
                 ),
               ]),
-            );
+            ));
           case 3:
-            final sorted = List.of(summary.allProducts)..sort((a, b) => b.quantity.compareTo(a.quantity));
-            return Padding(
+            // Explicit descending sort by units sold
+            final allSorted = List.of(summary.allProducts)..sort((a, b) => b.quantity.compareTo(a.quantity));
+            final sorted = allSorted.take(10).toList();
+            return SizedBox(height: h, child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Most Sold Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                const Text('Top 10 Most Sold Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Expanded(
                   child: ListView.builder(
                     itemCount: sorted.length,
                     itemBuilder: (ctx, i) => ListTile(
-                      leading: const Icon(Icons.shopping_cart, color: Colors.purple),
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.purple.shade50,
+                        child: Text('${i + 1}', style: TextStyle(color: Colors.purple.shade700, fontSize: 13, fontWeight: FontWeight.bold)),
+                      ),
                       title: Text(sorted[i].productName),
-                      trailing: Text('Sold: ${sorted[i].quantity}'),
+                      subtitle: Text(sorted[i].category),
+                      trailing: Text('${sorted[i].quantity} unit(s)', style: const TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
               ]),
-            );
+            ));
           default:
             return const SizedBox.shrink();
         }

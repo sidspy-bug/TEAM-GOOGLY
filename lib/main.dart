@@ -10,8 +10,6 @@ import 'services/locale_service.dart';
 import 'services/shop_config.dart';
 import 'services/theme_service.dart';
 import 'repositories/api_sales_repository.dart';
-import 'repositories/dummy_sales_repository.dart';
-import 'repositories/sales_repository_facade.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/inventory_screen.dart';
 import 'screens/sales_history_screen.dart';
@@ -255,18 +253,25 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
-  // Use API repository backed by the backend; falls back gracefully on error
-  final _apiRepo = ApiSalesRepository();
-  // Keep dummy repo as fallback for when backend is unreachable
-  final _dummyRepo = DummySalesRepository();
-  late final SalesRepositoryFacade _salesRepo;
+  late final ApiSalesRepository _salesRepo;
   bool _isPremium = true;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final GlobalKey<DashboardScreenState> _dashboardKey = GlobalKey<DashboardScreenState>();
+
+  void _handleSaveSuccess() {
+    if (mounted) {
+      setState(() {
+        _selectedIndex = 0; // Switch to Dashboard
+      });
+      // Trigger dashboard refresh via key
+      _dashboardKey.currentState?.refresh();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _salesRepo = SalesRepositoryFacade(_apiRepo, _dummyRepo);
+    _salesRepo = ApiSalesRepository();
   }
 
   List<Map<String, dynamic>> _localizedNavItems(BuildContext context) {
@@ -557,15 +562,28 @@ class _AppShellState extends State<AppShell> {
   Widget _buildPage() {
     switch (_selectedIndex) {
       case 0:
-        return DashboardScreen(salesRepository: _salesRepo, isPremiumUser: _isPremium, onPremiumToggle: (v) => setState(() => _isPremium = v));
+        return DashboardScreen(
+          key: _dashboardKey,
+          salesRepository: _salesRepo, 
+          isPremiumUser: _isPremium, 
+          onPremiumToggle: (v) => setState(() => _isPremium = v),
+        );
       case 1:
-        return InventoryScreen(salesRepository: _salesRepo);
+        return InventoryScreen(
+          salesRepository: _salesRepo,
+          onSaveSuccess: _handleSaveSuccess,
+        );
       case 2:
         return SalesHistoryScreen(salesRepository: _salesRepo);
       case 3:
         return SettingsScreen(onLogout: widget.onLogout);
       default:
-        return DashboardScreen(salesRepository: _salesRepo, isPremiumUser: _isPremium, onPremiumToggle: (v) => setState(() => _isPremium = v));
+        return DashboardScreen(
+          key: _dashboardKey,
+          salesRepository: _salesRepo, 
+          isPremiumUser: _isPremium, 
+          onPremiumToggle: (v) => setState(() => _isPremium = v),
+        );
     }
   }
 
@@ -795,7 +813,7 @@ class _AppShellState extends State<AppShell> {
             child: Stack(
               children: [
                 _buildPage(),
-                if (_selectedIndex == 0) const FloatingAiAssistant(),
+                if (_selectedIndex == 0) FloatingAiAssistant(onSaveSuccess: _handleSaveSuccess),
               ],
             ),
           ),

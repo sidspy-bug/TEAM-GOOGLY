@@ -13,7 +13,7 @@ class _AiAssistantPanelState extends State<AiAssistantPanel> {
   final _msgCtrl = TextEditingController();
   final _scrollController = ScrollController();
   bool _isLoading = false;
-  final List<Map<String, String>> _messages = [
+  static final List<Map<String, String>> _messages = [
     {'role': 'assistant', 'text': 'Hi! I\'m your GrowthOS AI assistant. Ask me about your sales, inventory, or business insights.'},
   ];
 
@@ -49,8 +49,14 @@ class _AiAssistantPanelState extends State<AiAssistantPanel> {
 
     try {
       // Try backend AI endpoint first
+      final historyStrings = _messages
+          .where((m) => m['text'] != text) // Exclude the message just added
+          .map((m) => "${m['role'] == 'assistant' ? 'Advisor' : 'User'}: ${m['text']}")
+          .toList();
+
       final response = await ApiService().post('/ai/chat', body: {
         'message': text,
+        'history': historyStrings,
       });
       if (mounted) {
         setState(() {
@@ -216,21 +222,31 @@ class _AiAssistantPanelState extends State<AiAssistantPanel> {
                     },
                   ),
           ),
-          // Quick suggestions
-          if (_messages.length <= 1)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
+          // Quick suggestions (Scrollable horizontally)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: bgColor,
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
                 children: [
-                  _quickChip('📊 Sales today', isDark),
-                  _quickChip('📦 Low stock?', isDark),
-                  _quickChip('💡 Give me a tip', isDark),
-                  _quickChip('💰 Profit estimate', isDark),
+                  _quickChip('Sales today', isDark),
+                  const SizedBox(width: 8),
+                  _quickChip('Which products to restock?', isDark),
+                  const SizedBox(width: 8),
+                  _quickChip('What is my top product?', isDark),
+                  const SizedBox(width: 8),
+                  _quickChip('Which items are not selling?', isDark),
+                  const SizedBox(width: 8),
+                  _quickChip('How to increase profit?', isDark),
                 ],
               ),
             ),
+          ),
           // Input bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),

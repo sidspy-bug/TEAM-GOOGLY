@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../models/sale.dart';
 import '../repositories/sales_repository.dart';
+import '../repositories/api_sales_repository.dart';
+import '../services/api_service.dart';
 import 'manual_entry_screen.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
@@ -57,6 +59,37 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          Container(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            child: TabBar(
+              labelColor: Colors.indigo,
+              unselectedLabelColor: isDark ? Colors.white54 : Colors.grey,
+              indicatorColor: Colors.indigo,
+              tabs: const [
+                Tab(text: 'Sales History'),
+                Tab(text: 'Purchase History'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildSalesHistoryView(context, l, isDark),
+                _buildPurchaseHistoryView(context, isDark),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSalesHistoryView(BuildContext context, AppLocalizations l, bool isDark) {
     return Stack(
       children: [
         FutureBuilder<List<Sale>>(
@@ -235,6 +268,153 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       ),
     ),
     ],
+    );
+  }
+
+  Widget _buildPurchaseHistoryView(BuildContext context, bool isDark) {
+    return FutureBuilder<dynamic>(
+      future: widget.salesRepository is ApiSalesRepository
+          ? ApiService().get('/purchases/history')
+          : Future.value([]),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error loading purchases: ${snapshot.error}'));
+        }
+        
+        final products = snapshot.data is List ? List<Map<String, dynamic>>.from(snapshot.data as List) : <Map<String, dynamic>>[];
+        if (products.isEmpty) {
+          return Card(
+            margin: const EdgeInsets.all(16),
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(child: Text('No purchase history/products found.')),
+            ),
+          );
+        }
+
+        // Group by Date
+        final Map<String, List<dynamic>> grouped = {};
+        for (var p in products) {
+          final rawDate = p['purchaseDate'] as String? ?? '';
+          String dateLabel = 'Unknown Date';
+          if (rawDate.length >= 10) {
+            try {
+              final parsed = DateTime.parse(rawDate);
+              dateLabel = '${parsed.day.toString().padLeft(2, '0')}/${parsed.month.toString().padLeft(2, '0')}/${parsed.year}';
+            } catch (_) {
+              dateLabel = rawDate.substring(0, 10);
+            }
+          }
+          grouped.putIfAbsent(dateLabel, () => []).add(p);
+        }
+
+        final sortKeys = grouped.keys.toList()
+          ..sort((a, b) {
+            try {
+              final partsA = a.split('/');
+              final partsB = b.split('/');
+              final dA = DateTime(int.parse(partsA[2]), int.parse(partsA[1]), int.parse(partsA[0]));
+              final dB = DateTime(int.parse(partsB[2]), int.parse(partsB[1]), int.parse(partsB[0]));
+              return dB.compareTo(dA);
+            } catch (_) {
+              return 0;
+            }
+          });
+
+        final totalInventoryCost = products.fold<double>(0, (sum, p) => sum + ((p['costPrice'] ?? 0) * (p['quantity'] ?? 1)));
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Summary card
+              Card(
+                color: isDark ? const Color(0xFF1E293B) : Colors.amber.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.shopping_cart, color: Colors.amber.shade700, size: 22),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Total Purchase Value: ₹${totalInventoryCost.toStringAsFixed(0)}',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.amber.shade200 : Colors.amber.shade800),
+                      ),
+                      const SizedBox(width: 24),
+                      Text(
+                        '${products.length} Restocks',
+                        style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade700),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              ...sortKeys.map((dateLabel) {
+                final dateProducts = grouped[dateLabel]!;
+                final dayCost = dateProducts.fold<double>(0, (sum, p) => sum + ((p['costPrice'] ?? 0) * (p['quantity'] ?? 1)));
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Date header
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_today, size: 16, color: Colors.amber.shade600),
+                          const SizedBox(width: 8),
+                          Text(dateLabel, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.amber.shade200 : Colors.amber.shade700)),
+                          const Spacer(),
+                          Text('Expended: ₹${dayCost.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade700)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Card(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          columnSpacing: 24,
+                          headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF334155) : Colors.grey.shade50),
+                          columns: const [
+                            DataColumn(label: Text('Product', style: TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(label: Text('Quantity', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                            DataColumn(label: Text('GST (₹)', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                            DataColumn(label: Text('Base Cost (₹)', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                            DataColumn(label: Text('Total Ext. (₹)', style: TextStyle(fontWeight: FontWeight.bold)), numeric: true),
+                          ],
+                          rows: dateProducts.map((p) {
+                            final total = (p['costPrice'] ?? 0) * (p['quantity'] ?? 1);
+                            return DataRow(cells: [
+                              DataCell(Text(p['productName']?.toString() ?? 'Unknown')),
+                              DataCell(Text('${p['quantity'] ?? 1}')),
+                              DataCell(Text('₹${p['gst'] ?? 0}')),
+                              DataCell(Text('₹${p['costPrice'] ?? 0}')),
+                              DataCell(Text('₹${total.toStringAsFixed(0)}')),
+                            ]);
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                );
+              }),
+            ],
+          ),
+        );
+      },
     );
   }
 }

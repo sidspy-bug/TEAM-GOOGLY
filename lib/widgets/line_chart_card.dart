@@ -4,8 +4,18 @@ import 'package:fl_chart/fl_chart.dart';
 class LineChartCard extends StatelessWidget {
   final Map<String, double> salesOverTime;
   final Map<String, double> costOverTime;
+  final String? title;
+  final bool showSalesOnly;
+  final bool showProfitOnly;
 
-  const LineChartCard({super.key, required this.salesOverTime, this.costOverTime = const {}});
+  const LineChartCard({
+    super.key,
+    required this.salesOverTime,
+    this.costOverTime = const {},
+    this.title,
+    this.showSalesOnly = false,
+    this.showProfitOnly = false,
+  });
 
   String _formatRupee(double v) {
     if (v >= 1000) return '₹${(v / 1000).toStringAsFixed(1)}K';
@@ -24,7 +34,7 @@ class LineChartCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Daily Earnings', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                Text(title ?? 'Daily Earnings', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 const SizedBox(height: 160, child: Center(child: Text('No data available'))),
               ],
@@ -33,25 +43,37 @@ class LineChartCard extends StatelessWidget {
         );
       }
 
-      final salesSpots = <FlSpot>[];
-      final costSpots = <FlSpot>[];
+      final List<FlSpot> mainSpots = [];
+      final List<FlSpot> secondarySpots = [];
+      
       for (var i = 0; i < entries.length; i++) {
-        salesSpots.add(FlSpot(i.toDouble(), entries[i].value));
-        final costVal = costOverTime[entries[i].key] ?? 0;
-        costSpots.add(FlSpot(i.toDouble(), costVal));
+        final date = entries[i].key;
+        final salesVal = entries[i].value;
+        final costVal = costOverTime[date] ?? 0;
+        
+        if (showProfitOnly) {
+          mainSpots.add(FlSpot(i.toDouble(), salesVal - costVal));
+        } else if (showSalesOnly) {
+          mainSpots.add(FlSpot(i.toDouble(), salesVal));
+        } else {
+          mainSpots.add(FlSpot(i.toDouble(), salesVal));
+          secondarySpots.add(FlSpot(i.toDouble(), costVal));
+        }
       }
 
-      final allValues = [...salesSpots.map((s) => s.y), ...costSpots.map((s) => s.y)];
+      final allValues = [...mainSpots.map((s) => s.y), ...secondarySpots.map((s) => s.y)];
       final rawMaxY = allValues.reduce((a, b) => a > b ? a : b);
       final ceilMaxY = (rawMaxY * 1.15).ceilToDouble();
       double yInterval = (ceilMaxY / 5).ceilToDouble();
       if (yInterval < 1) yInterval = 1;
-      // Round yInterval to a nice number
+      
       if (yInterval > 100) {
         yInterval = (yInterval / 100).ceil() * 100;
       } else if (yInterval > 10) {
         yInterval = (yInterval / 10).ceil() * 10;
       }
+
+      final isDark = Theme.of(context).brightness == Brightness.dark;
 
       return Card(
         child: Padding(
@@ -61,11 +83,17 @@ class LineChartCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Text('Daily Earnings', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  Text(title ?? (showProfitOnly ? 'Profit Trend' : (showSalesOnly ? 'Sales Trend' : 'Daily Earnings')), 
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                   const Spacer(),
-                  _legend(Colors.green, 'Sales'),
-                  const SizedBox(width: 12),
-                  _legend(Colors.red, 'Cost'),
+                  if (!showSalesOnly && !showProfitOnly) ...[
+                    _legend(Colors.green, 'Sales'),
+                    const SizedBox(width: 12),
+                    _legend(Colors.red, 'Cost'),
+                  ] else if (showProfitOnly)
+                    _legend(Colors.blue, 'Profit')
+                  else
+                    _legend(Colors.green, 'Sales'),
                 ],
               ),
               const SizedBox(height: 10),
@@ -107,10 +135,28 @@ class LineChartCard extends StatelessWidget {
                       ),
                     ),
                     lineBarsData: [
-                      LineChartBarData(spots: salesSpots, isCurved: true, color: Colors.green, barWidth: 2, dotData: FlDotData(show: false), belowBarData: BarAreaData(show: true, color: Colors.green.withValues(alpha: 0.08))),
-                      LineChartBarData(spots: costSpots, isCurved: true, color: Colors.red, barWidth: 2, dotData: FlDotData(show: false), dashArray: [4, 3]),
+                      LineChartBarData(
+                        spots: mainSpots,
+                        isCurved: true,
+                        color: showProfitOnly ? Colors.blue : Colors.green,
+                        barWidth: 3,
+                        dotData: const FlDotData(show: true),
+                        belowBarData: BarAreaData(
+                          show: true, 
+                          color: (showProfitOnly ? Colors.blue : Colors.green).withValues(alpha: 0.1)
+                        ),
+                      ),
+                      if (secondarySpots.isNotEmpty)
+                        LineChartBarData(
+                          spots: secondarySpots,
+                          isCurved: true,
+                          color: Colors.red,
+                          barWidth: 2,
+                          dotData: const FlDotData(show: false),
+                          dashArray: [4, 4],
+                        ),
                     ],
-                    borderData: FlBorderData(show: true, border: const Border(left: BorderSide(), bottom: BorderSide())),
+                    borderData: FlBorderData(show: true, border: Border(left: BorderSide(color: isDark ? Colors.white24 : Colors.black12), bottom: BorderSide(color: isDark ? Colors.white24 : Colors.black12))),
                   ),
                 ),
               ),
@@ -125,7 +171,7 @@ class LineChartCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Daily Earnings', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              Text(title ?? 'Daily Earnings', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               SizedBox(height: 160, child: Center(child: Text('Error: $e'))),
             ],

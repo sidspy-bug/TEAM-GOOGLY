@@ -153,6 +153,12 @@ class ApiSalesRepository implements SalesRepository {
       final Map<String, Map<String, int>> soldVsStock = {};
       int computedLowStock = 0;
 
+      final oldestDate = sales.isNotEmpty 
+          ? sales.map((s) => s.date).reduce((a, b) => a.isBefore(b) ? a : b) 
+          : DateTime.now();
+      final diffDays = DateTime.now().difference(oldestDate).inDays;
+      final numberOfDays = diffDays > 0 ? diffDays : 14; 
+
       final Map<String, Sale> perProduct = {};
       for (final s in sales) {
         final key = s.productId;
@@ -174,27 +180,49 @@ class ApiSalesRepository implements SalesRepository {
         }
       }
 
+      final List<Sale> isolatedLowStockProducts = [];
+
       for (final s in perProduct.values) {
         categorySales[s.category] = (categorySales[s.category] ?? 0) + s.dailyRevenue;
         soldVsStock[s.productName] = {
           'sold': s.quantity,
           'stock': s.currentStock,
         };
-        if (s.currentStock < 15) computedLowStock++;
+
+        // Dynamic threshold: avgDaily * 3 or minimum of 3
+        final avgDaily = s.quantity / numberOfDays;
+        final threshold = (avgDaily * 3).ceil();
+        final actualThreshold = threshold > 3 ? threshold : 3;
+        
+        if (s.currentStock <= actualThreshold) {
+           computedLowStock++;
+           isolatedLowStockProducts.add(s);
+        }
       }
 
       // Sort by quantity for top/low products
       final sorted = List<Sale>.from(perProduct.values)..sort((a, b) => b.quantity.compareTo(a.quantity));
       final topProducts = sorted.take(3).toList();
-      final lowProducts = List<Sale>.from(perProduct.values)
+      final lowProducts = isolatedLowStockProducts
         ..sort((a, b) => a.currentStock.compareTo(b.currentStock));
 
-      // Build salesOverTime and costOverTime from analytics
-      // Use daily data as single-day point; for multi-day, the API would need expansion
-      final now = DateTime.now();
-      final dateKey = DateTime(now.year, now.month, now.day).toIso8601String();
-      final Map<String, double> salesOverTime = {dateKey: dailyRevenue > 0 ? dailyRevenue : totalSales};
-      final Map<String, double> costOverTime = {dateKey: dailyRevenue > 0 ? dailyRevenue - dailyProfit : totalSales - totalProfit};
+      // Build salesOverTime and costOverTime dynamically over actual history dates
+      final Map<String, double> salesOverTime = {};
+      final Map<String, double> costOverTime = {};
+      
+      // If no valid sales exist, fill today with zero
+      if (sales.isEmpty) {
+        final dateKey = DateTime.now().toIso8601String();
+        salesOverTime[dateKey] = 0;
+        costOverTime[dateKey] = 0;
+      } else {
+        // Group everything by day
+        for (final s in sales) {
+          final dateKey = DateTime(s.date.year, s.date.month, s.date.day).toIso8601String();
+          salesOverTime[dateKey] = (salesOverTime[dateKey] ?? 0) + s.dailyRevenue;
+          costOverTime[dateKey] = (costOverTime[dateKey] ?? 0) + (s.dailyRevenue - s.estimatedProfit);
+        }
+      }
 
       _cachedSummary = DashboardSummary(
         totalSales: totalSales > 0 ? totalSales : _sumField(sales, (s) => s.dailyRevenue),
@@ -203,9 +231,9 @@ class ApiSalesRepository implements SalesRepository {
         unitsSold: unitsSold > 0 ? unitsSold : sales.fold(0, (sum, s) => sum + s.quantity),
         categorySales: categorySales,
         topProducts: topProducts,
-        lowProducts: lowProducts.take(3).toList(),
+        lowProducts: lowProducts,
         allProducts: sorted,
-        lowStockCount: lowStockCount > 0 ? lowStockCount : computedLowStock,
+        lowStockCount: computedLowStock,
         salesTrendUp: dailyProfit >= 0,
         salesOverTime: salesOverTime,
         costOverTime: costOverTime,
@@ -214,9 +242,8 @@ class ApiSalesRepository implements SalesRepository {
 
       return _cachedSummary!;
     } catch (e) {
-      // Build a minimal summary from whatever sales data we have
-      final sales = _cachedSales ?? [];
-      return _buildFallbackSummary(sales);
+      if (_cachedSummary != null) return _cachedSummary!;
+      throw Exception('Failed to load dashboard summary: $e');
     }
   }
 
@@ -279,32 +306,4 @@ class ApiSalesRepository implements SalesRepository {
     return sales.fold(0.0, (sum, s) => sum + fn(s));
   }
 
-  DashboardSummary _buildFallbackSummary(List<Sale> sales) {
-    final Map<String, double> categorySales = {};
-    final Map<String, Map<String, int>> soldVsStock = {};
-    int lowStockCount = 0;
-
-    for (final s in sales) {
-      categorySales[s.category] = (categorySales[s.category] ?? 0) + s.dailyRevenue;
-      soldVsStock[s.productName] = {'sold': s.quantity, 'stock': s.currentStock};
-      if (s.currentStock < 15) lowStockCount++;
-    }
-
-    final sorted = List<Sale>.from(sales)..sort((a, b) => b.quantity.compareTo(a.quantity));
-
-    return DashboardSummary(
-      totalSales: _sumField(sales, (s) => s.dailyRevenue),
-      estimatedProfit: _sumField(sales, (s) => s.estimatedProfit),
-      unitsSold: sales.fold(0, (sum, s) => sum + s.quantity),
-      categorySales: categorySales,
-      topProducts: sorted.take(3).toList(),
-      lowProducts: sorted.reversed.take(3).toList(),
-      allProducts: sorted,
-      lowStockCount: lowStockCount,
-      salesTrendUp: true,
-      salesOverTime: {},
-      costOverTime: {},
-      soldVsStock: soldVsStock,
-    );
-  }
 }
