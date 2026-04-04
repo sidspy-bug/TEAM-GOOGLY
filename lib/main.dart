@@ -119,6 +119,13 @@ class _MyAppState extends State<MyApp> {
     return AppShell(onLogout: _handleLogout);
   }
 
+  // ── Dark color constants ──────────────────────────────────────────
+  static const _darkScaffold = Color(0xFF0F172A);
+  static const _darkCard = Color(0xFF1E293B);
+  static const _darkInput = Color(0xFF334155);
+  static const _darkBorder = Color(0xFF475569);
+  static const _darkTextSecondary = Color(0xFF94A3B8);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -139,15 +146,94 @@ class _MyAppState extends State<MyApp> {
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.indigo,
+        scaffoldBackgroundColor: _darkScaffold,
+        canvasColor: _darkCard,
+        cardColor: _darkCard,
+        dialogBackgroundColor: _darkCard,
+        dividerColor: _darkBorder,
         colorScheme: ColorScheme.dark(
           primary: Colors.indigo.shade300,
-          secondary: Colors.indigoAccent,
+          secondary: Colors.indigoAccent.shade100,
+          surface: _darkCard,
+          onSurface: Colors.white,
         ),
         cardTheme: CardThemeData(
-          elevation: 1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          elevation: 2,
+          color: _darkCard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: _darkBorder.withValues(alpha: 0.3)),
+          ),
         ),
-        appBarTheme: const AppBarTheme(elevation: 0),
+        appBarTheme: const AppBarTheme(
+          elevation: 0,
+          backgroundColor: _darkScaffold,
+          foregroundColor: Colors.white,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: _darkInput,
+          hintStyle: const TextStyle(color: _darkTextSecondary),
+          labelStyle: const TextStyle(color: _darkTextSecondary),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: _darkBorder),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: _darkBorder),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.indigo.shade300, width: 2),
+          ),
+        ),
+        popupMenuTheme: const PopupMenuThemeData(
+          color: _darkCard,
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: _darkCard,
+        ),
+        drawerTheme: const DrawerThemeData(
+          backgroundColor: _darkScaffold,
+        ),
+        dataTableTheme: DataTableThemeData(
+          headingRowColor: WidgetStateProperty.all(_darkInput),
+          dataRowColor: WidgetStateProperty.all(_darkCard),
+          decoration: BoxDecoration(color: _darkCard),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.white),
+          bodyMedium: TextStyle(color: Colors.white),
+          bodySmall: TextStyle(color: _darkTextSecondary),
+          titleLarge: TextStyle(color: Colors.white),
+          titleMedium: TextStyle(color: Colors.white),
+          titleSmall: TextStyle(color: Colors.white),
+          labelLarge: TextStyle(color: Colors.white),
+          labelMedium: TextStyle(color: _darkTextSecondary),
+          labelSmall: TextStyle(color: _darkTextSecondary),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white70),
+        listTileTheme: const ListTileThemeData(
+          textColor: Colors.white,
+          iconColor: Colors.white70,
+        ),
+        switchTheme: SwitchThemeData(
+          thumbColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected) ? Colors.indigo.shade300 : Colors.grey),
+          trackColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected) ? Colors.indigo.shade800 : _darkInput),
+        ),
+        chipTheme: ChipThemeData(
+          backgroundColor: _darkInput,
+          labelStyle: const TextStyle(color: Colors.white),
+        ),
+        expansionTileTheme: const ExpansionTileThemeData(
+          iconColor: Colors.white70,
+          collapsedIconColor: Colors.white70,
+          textColor: Colors.white,
+          collapsedTextColor: Colors.white,
+        ),
       ),
       themeMode: ThemeService.instance.themeMode.value,
       home: _initializing
@@ -308,7 +394,7 @@ class _AppShellState extends State<AppShell> {
             // Email
             Text(
               user?.email ?? '',
-              style: TextStyle(color: Colors.grey.shade600),
+              style: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Colors.grey.shade600),
             ),
             const SizedBox(height: 16),
             // Provider badges
@@ -417,7 +503,7 @@ class _AppShellState extends State<AppShell> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Choose an icon', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+              Text('Choose an icon', style: TextStyle(fontSize: 13, color: Theme.of(ctx).textTheme.bodySmall?.color ?? Colors.grey.shade600)),
               const SizedBox(height: 12),
               GridView.builder(
                 shrinkWrap: true,
@@ -484,7 +570,18 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _buildSidebarContent({bool isDrawer = false}) {
-    return Column(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sidebarBg = isDark ? const Color(0xFF0F172A) : Colors.white;
+    final selectedBg = isDark ? const Color(0xFF1E293B) : Colors.indigo.shade50;
+    final textColor = isDark ? Colors.white : Colors.grey.shade800;
+    final selectedTextColor = isDark ? Colors.indigo.shade200 : Colors.indigo;
+    final iconColor = isDark ? Colors.white70 : Colors.grey.shade700;
+    final selectedIconColor = isDark ? Colors.indigo.shade200 : Colors.indigo;
+    final subtitleColor = isDark ? const Color(0xFF94A3B8) : Colors.grey.shade400;
+
+    return Container(
+      color: sidebarBg,
+      child: Column(
       children: [
         // Dynamic shop name header
         ValueListenableBuilder<String>(
@@ -498,7 +595,7 @@ class _AppShellState extends State<AppShell> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: Colors.indigo.shade50,
+                      color: isDark ? Colors.indigo.shade900 : Colors.indigo.shade50,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(Icons.storefront, color: Colors.indigo.shade400, size: 22),
@@ -507,7 +604,7 @@ class _AppShellState extends State<AppShell> {
                   Expanded(
                     child: Text(
                       name,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: selectedTextColor),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -516,13 +613,13 @@ class _AppShellState extends State<AppShell> {
             );
           },
         ),
-        const Divider(height: 1),
+        Divider(height: 1, color: isDark ? const Color(0xFF334155) : null),
         ...List.generate(_localizedNavItems(context).length, (i) {
           final items = _localizedNavItems(context);
           final item = items[i];
           final selected = _selectedIndex == i;
           return Material(
-            color: selected ? Colors.indigo.shade50 : Colors.transparent,
+            color: selected ? selectedBg : Colors.transparent,
             child: InkWell(
               onTap: () {
                 setState(() => _selectedIndex = i);
@@ -532,13 +629,13 @@ class _AppShellState extends State<AppShell> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
-                    Icon(item['icon'] as IconData, size: 20, color: selected ? Colors.indigo : Colors.grey.shade700),
+                    Icon(item['icon'] as IconData, size: 20, color: selected ? selectedIconColor : iconColor),
                     const SizedBox(width: 12),
                     Text(
                       item['label'] as String,
                       style: TextStyle(
                         fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                        color: selected ? Colors.indigo : Colors.grey.shade800,
+                        color: selected ? selectedTextColor : textColor,
                       ),
                     ),
                   ],
@@ -548,7 +645,7 @@ class _AppShellState extends State<AppShell> {
           );
         }),
         const Spacer(),
-        const Divider(height: 1),
+        Divider(height: 1, color: isDark ? const Color(0xFF334155) : null),
         Material(
           color: Colors.transparent,
           child: InkWell(
@@ -566,24 +663,25 @@ class _AppShellState extends State<AppShell> {
           ),
         ),
         // Sidebar footer — platform credit
-        const Divider(height: 1),
+        Divider(height: 1, color: isDark ? const Color(0xFF334155) : null),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Column(
             children: [
-              Text('GrowthOS v0.1.0', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+              Text('GrowthOS v0.1.0', style: TextStyle(fontSize: 11, color: subtitleColor)),
               const SizedBox(height: 2),
-              Text('\u00a9 GrowthOS', style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
+              Text('\u00a9 GrowthOS', style: TextStyle(fontSize: 10, color: subtitleColor)),
             ],
           ),
         ),
       ],
-    );
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
     final isMobile = _isMobile(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -601,7 +699,7 @@ class _AppShellState extends State<AppShell> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('GrowthOS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            Text('Powered by GrowthOS', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+            Text('Powered by GrowthOS', style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500)),
           ],
         ),
         centerTitle: true,
@@ -620,7 +718,9 @@ class _AppShellState extends State<AppShell> {
               margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               decoration: BoxDecoration(
-                color: _isPremium ? Colors.amber.shade100 : Colors.grey.shade200,
+                color: _isPremium
+                    ? (isDark ? Colors.amber.shade900.withValues(alpha: 0.4) : Colors.amber.shade100)
+                    : (isDark ? const Color(0xFF334155) : Colors.grey.shade200),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -629,7 +729,7 @@ class _AppShellState extends State<AppShell> {
                   Icon(
                     _isPremium ? Icons.star : Icons.star_border,
                     size: 16,
-                    color: _isPremium ? Colors.amber.shade800 : Colors.grey.shade600,
+                    color: _isPremium ? Colors.amber.shade600 : (isDark ? Colors.white54 : Colors.grey.shade600),
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -637,7 +737,7 @@ class _AppShellState extends State<AppShell> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: _isPremium ? Colors.amber.shade900 : Colors.grey.shade700,
+                      color: _isPremium ? Colors.amber.shade600 : (isDark ? Colors.white54 : Colors.grey.shade700),
                     ),
                   ),
                 ],
@@ -663,10 +763,10 @@ class _AppShellState extends State<AppShell> {
                     children: [
                       Text(
                         user?.displayName ?? 'User',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color),
                       ),
                       if (user?.email != null)
-                        Text(user!.email!, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                        Text(user!.email!, style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color)),
                       const Divider(),
                     ],
                   ),
@@ -684,12 +784,11 @@ class _AppShellState extends State<AppShell> {
         children: [
           // Permanent sidebar on desktop only
           if (!isMobile) ...[
-            Container(
+            SizedBox(
               width: 240,
-              color: Colors.white,
               child: _buildSidebarContent(),
             ),
-            VerticalDivider(width: 1, thickness: 1, color: Colors.grey.shade300),
+            VerticalDivider(width: 1, thickness: 1, color: isDark ? const Color(0xFF334155) : Colors.grey.shade300),
           ],
           // Main content area with floating AI assistant (Dashboard only)
           Expanded(

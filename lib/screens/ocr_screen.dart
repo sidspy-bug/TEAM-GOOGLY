@@ -53,8 +53,10 @@ class _OcrScreenState extends State<OcrScreen> {
   List<ParsedProduct> _products = [];
   bool _isProcessing = false;
   bool _isSaving = false;
-  String? _error;
   String? _successMsg;
+  // Consolidated error tracking
+  List<String> _errorMessages = [];
+  int _notFoundCount = 0;
 
   static const _categories = [
     'General', 'Grocery', 'Dairy', 'Beverages', 'Snacks',
@@ -77,20 +79,21 @@ class _OcrScreenState extends State<OcrScreen> {
       setState(() {
         _imageBytes = bytes;
         _rawText = null;
-        _error = null;
+        _errorMessages = [];
+        _notFoundCount = 0;
         _successMsg = null;
         for (final p in _products) { p.dispose(); }
         _products = [];
       });
       await _processImage(bytes);
     } catch (e) {
-      setState(() => _error = 'Failed to pick image: $e');
+      setState(() => _errorMessages = ['Failed to pick image: $e']);
     }
   }
 
   // ── OCR processing ─────────────────────────────────────────────────────
   Future<void> _processImage(Uint8List bytes) async {
-    setState(() { _isProcessing = true; _error = null; });
+    setState(() { _isProcessing = true; _errorMessages = []; });
     try {
       final result = await ApiService().post('/ocr/scan', body: {
         'image': base64Encode(bytes),
@@ -106,8 +109,6 @@ class _OcrScreenState extends State<OcrScreen> {
         _products = parsed.map((item) => ParsedProduct(
           name: item['productName'] ?? '',
           costPrice: _toDouble(item['costPrice']),
-          // In sale mode, OCR responses often provide unit price as costPrice
-          // and line total separately; derive SP so rows are editable without zeros.
           sellingPrice: _derivedSellingPrice(item),
           quantity: (item['quantity'] ?? 1).toInt(),
         )).toList();
@@ -116,7 +117,7 @@ class _OcrScreenState extends State<OcrScreen> {
     } catch (e) {
       final message = e is ApiException ? e.message : e.toString();
       setState(() {
-        _error = 'OCR processing failed: $message';
+        _errorMessages = ['OCR processing failed: $message'];
         _isProcessing = false;
       });
     }
@@ -149,16 +150,17 @@ class _OcrScreenState extends State<OcrScreen> {
       }
     }
 
-    setState(() { _isSaving = true; _error = null; _successMsg = null; });
+    setState(() { _isSaving = true; _errorMessages = []; _notFoundCount = 0; _successMsg = null; });
     int saved = 0;
     final List<String> errs = [];
+    final List<String> notFoundNames = [];
 
     List<dynamic> existingProducts = [];
     try {
       final data = await ApiService().get('/products/list');
       existingProducts = data is List ? data : [];
     } catch (e) {
-      setState(() { _isSaving = false; _error = 'Failed to load products: $e'; });
+      setState(() { _isSaving = false; _errorMessages = ['Failed to load products: $e']; });
       return;
     }
 
@@ -196,7 +198,6 @@ class _OcrScreenState extends State<OcrScreen> {
               'productName': name,
               'category': p.category,
               'costPrice': cp,
-              // CP-first flow: SP can be updated later during sale OCR.
               'sellingPrice': cp,
             });
             productId = created['id'];
@@ -210,7 +211,7 @@ class _OcrScreenState extends State<OcrScreen> {
           saved++;
         } else if (isSaleMode) {
           if (existing == null || existing['id'] == null) {
-            errs.add('$name: product not found. Add it via purchase first.');
+            notFoundNames.add(name);
             continue;
           }
           final productId = existing['id'];
@@ -229,16 +230,25 @@ class _OcrScreenState extends State<OcrScreen> {
         }
       } catch (e) { errs.add('${p.nameCtrl.text}: $e'); }
     }
+
     setState(() {
       _isSaving = false;
-      // Clear the API cache so dashboard/inventory/sales screens show fresh data
       ApiSalesRepository().clearCache();
-      _successMsg = errs.isEmpty
+
+      // Consolidate not-found errors
+      _notFoundCount = notFoundNames.length;
+      _errorMessages = [];
+      if (notFoundNames.isNotEmpty) {
+        _errorMessages.add('${notFoundNames.length} product(s) not found in inventory.');
+        _errorMessages.addAll(notFoundNames);
+      }
+      _errorMessages.addAll(errs);
+
+      _successMsg = saved > 0
           ? (isPurchaseMode
               ? 'Saved $saved product(s) to inventory!'
               : 'Saved $saved sale transaction(s)!')
-          : 'Saved $saved. ${errs.length} failed.';
-      if (errs.isNotEmpty) _error = errs.join('\n');
+          : null;
     });
   }
 
@@ -272,7 +282,7 @@ class _OcrScreenState extends State<OcrScreen> {
 
   void _clearAll() => setState(() {
     _imageBytes = null; _rawText = null; _vendorName = null;
-    _extractedDate = null; _error = null; _successMsg = null;
+    _extractedDate = null; _errorMessages = []; _notFoundCount = 0; _successMsg = null;
     for (final p in _products) { p.dispose(); }
     _products = [];
   });
@@ -281,9 +291,12 @@ class _OcrScreenState extends State<OcrScreen> {
   @override
   Widget build(BuildContext context) {
     final mobile = MediaQuery.of(context).size.width < 600;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasProducts = !_isProcessing && _products.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('OCR Scanner'),
+        title: Text(widget.mode == 'purchase' ? 'Scan Purchase Invoice' : 'Scan Sales Invoice'),
         leading: IconButton(icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pop()),
         actions: [
@@ -291,42 +304,101 @@ class _OcrScreenState extends State<OcrScreen> {
             IconButton(icon: const Icon(Icons.clear), tooltip: 'Clear', onPressed: _clearAll),
         ],
       ),
+      // Sticky save button at bottom
+      bottomNavigationBar: hasProducts ? _stickyBottomBar(isDark) : null,
       body: SingleChildScrollView(
         padding: EdgeInsets.all(mobile ? 12 : 24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (_imageBytes == null)
-            _uploadArea(mobile)
+            _uploadArea(mobile, isDark)
           else ...[
-            _imagePreview(mobile),
+            _imagePreview(mobile, isDark),
             const SizedBox(height: 16),
-            if (_isProcessing) _processingCard(),
-            if (_error != null) _errorBanner(),
-            if (_successMsg != null) _successBanner(),
-            if (!_isProcessing && _products.isNotEmpty) ...[
-              _scanSummary(),
+            if (_isProcessing) _processingCard(isDark),
+            if (_successMsg != null) _successBanner(isDark),
+            if (_errorMessages.isNotEmpty) _consolidatedErrorBanner(isDark),
+            if (hasProducts) ...[
+              _scanSummary(isDark),
               const SizedBox(height: 12),
-              if (mobile) _productCards() else _productTable(),
+              if (mobile) _productCards(isDark) else _productTable(isDark),
               const SizedBox(height: 16),
-              _actionButtons(),
             ],
-            if (!_isProcessing && _products.isEmpty && _rawText != null) _noProducts(),
+            if (!_isProcessing && _products.isEmpty && _rawText != null) _noProducts(isDark),
             if (_rawText != null && _rawText!.isNotEmpty) ...[
-              const SizedBox(height: 16), _rawTextExpander(),
+              const SizedBox(height: 16), _rawTextExpander(isDark),
             ],
+            // Bottom padding for sticky bar
+            if (hasProducts) const SizedBox(height: 80),
           ],
         ]),
       ),
     );
   }
 
+  // ── Sticky bottom save bar ─────────────────────────────────────────────
+  Widget _stickyBottomBar(bool isDark) {
+    final n = _products.where((p) => p.selected).length;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: Border(top: BorderSide(color: isDark ? const Color(0xFF475569) : Colors.grey.shade200)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, -2)),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _isSaving ? null : _saveToInventory,
+                icon: _isSaving
+                    ? const SizedBox(width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.save),
+                label: Text(_isSaving
+                    ? 'Saving…'
+                    : (widget.mode == 'purchase'
+                        ? 'Save $n Product(s) to Inventory'
+                        : 'Save $n Sale Transaction(s)'),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            OutlinedButton.icon(
+              onPressed: _addRow,
+              icon: const Icon(Icons.add),
+              label: const Text('Add'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.indigo,
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Upload area ────────────────────────────────────────────────────────
-  Widget _uploadArea(bool mobile) => Center(
+  Widget _uploadArea(bool mobile, bool isDark) => Center(
     child: Container(
       width: mobile ? double.infinity : 500,
       padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.indigo.shade100, width: 2),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF475569) : Colors.indigo.shade100, width: 2),
       ),
       child: Column(children: [
         Icon(Icons.document_scanner_outlined, size: 64, color: Colors.indigo.shade300),
@@ -335,7 +407,7 @@ class _OcrScreenState extends State<OcrScreen> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         Text('Upload a supplier invoice, receipt, or stock list.\nProducts are auto-detected with prices & quantities.',
-            style: TextStyle(color: Colors.grey.shade600), textAlign: TextAlign.center),
+            style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600), textAlign: TextAlign.center),
         const SizedBox(height: 24),
         Wrap(spacing: 12, runSpacing: 12, alignment: WrapAlignment.center, children: [
           ElevatedButton.icon(
@@ -360,7 +432,7 @@ class _OcrScreenState extends State<OcrScreen> {
   );
 
   // ── Image preview (collapsed) ─────────────────────────────────────────
-  Widget _imagePreview(bool mobile) => ExpansionTile(
+  Widget _imagePreview(bool mobile, bool isDark) => ExpansionTile(
     leading: const Icon(Icons.image, color: Colors.indigo),
     title: const Text('Scanned Image', style: TextStyle(fontWeight: FontWeight.w600)),
     initiallyExpanded: false,
@@ -378,57 +450,107 @@ class _OcrScreenState extends State<OcrScreen> {
   );
 
   // ── Status cards ───────────────────────────────────────────────────────
-  Widget _processingCard() => Card(
+  Widget _processingCard(bool isDark) => Card(
     margin: const EdgeInsets.only(bottom: 16),
     child: Container(width: double.infinity, padding: const EdgeInsets.all(32),
-      child: const Column(children: [
-        CircularProgressIndicator(), SizedBox(height: 16),
-        Text('Scanning & extracting product data…', style: TextStyle(fontSize: 16, color: Colors.grey)),
-        SizedBox(height: 4),
-        Text('This may take a few seconds', style: TextStyle(fontSize: 13, color: Colors.grey)),
+      child: Column(children: [
+        const CircularProgressIndicator(),
+        const SizedBox(height: 16),
+        Text('Scanning & extracting product data…', style: TextStyle(fontSize: 16, color: isDark ? const Color(0xFF94A3B8) : Colors.grey)),
+        const SizedBox(height: 4),
+        Text('This may take a few seconds', style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : Colors.grey)),
       ]),
     ),
   );
 
-  Widget _errorBanner() => Container(
-    width: double.infinity, margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.shade200)),
-    child: Row(children: [
-      Icon(Icons.error_outline, color: Colors.red.shade600, size: 20),
-      const SizedBox(width: 8),
-      Expanded(child: Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 13))),
-      if (_imageBytes != null)
-        TextButton(onPressed: () => _processImage(_imageBytes!), child: const Text('Retry')),
-    ]),
-  );
+  // ── Consolidated error banner ──────────────────────────────────────────
+  Widget _consolidatedErrorBanner(bool isDark) {
+    final hasManyErrors = _errorMessages.length > 2;
+    final summaryText = _notFoundCount > 0
+        ? '$_notFoundCount product(s) not found — Add them via Purchase first'
+        : '${_errorMessages.length} error(s) occurred';
 
-  Widget _successBanner() => Container(
+    return Container(
+      width: double.infinity, margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.red.shade900.withValues(alpha: 0.3) : Colors.red.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isDark ? Colors.red.shade800.withValues(alpha: 0.5) : Colors.red.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              Icon(Icons.error_outline, color: Colors.red.shade400, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(summaryText, style: TextStyle(
+                color: isDark ? Colors.red.shade300 : Colors.red.shade700,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ))),
+              if (_imageBytes != null && _notFoundCount == 0)
+                TextButton(onPressed: () => _processImage(_imageBytes!), child: const Text('Retry')),
+            ]),
+          ),
+          if (hasManyErrors)
+            ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+              title: Text('Show details (${_errorMessages.length})',
+                  style: TextStyle(fontSize: 12, color: isDark ? Colors.red.shade300 : Colors.red.shade600)),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: _errorMessages.skip(1).map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('• ', style: TextStyle(color: isDark ? Colors.red.shade300 : Colors.red.shade600)),
+                          Expanded(child: Text(e, style: TextStyle(fontSize: 12, color: isDark ? Colors.red.shade300 : Colors.red.shade700))),
+                        ],
+                      ),
+                    )).toList(),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _successBanner(bool isDark) => Container(
     width: double.infinity, margin: const EdgeInsets.only(bottom: 12),
     padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.shade200)),
+    decoration: BoxDecoration(
+      color: isDark ? Colors.green.shade900.withValues(alpha: 0.3) : Colors.green.shade50,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: isDark ? Colors.green.shade800.withValues(alpha: 0.5) : Colors.green.shade200),
+    ),
     child: Row(children: [
-      Icon(Icons.check_circle, color: Colors.green.shade600, size: 20),
+      Icon(Icons.check_circle, color: Colors.green.shade400, size: 20),
       const SizedBox(width: 8),
-      Expanded(child: Text(_successMsg!, style: TextStyle(color: Colors.green.shade700))),
+      Expanded(child: Text(_successMsg!, style: TextStyle(color: isDark ? Colors.green.shade300 : Colors.green.shade700))),
     ]),
   );
 
   // ── Scan summary ───────────────────────────────────────────────────────
-  Widget _scanSummary() => Card(
-    color: Colors.indigo.shade50,
+  Widget _scanSummary(bool isDark) => Card(
+    color: isDark ? Colors.indigo.shade900.withValues(alpha: 0.3) : Colors.indigo.shade50,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     child: Padding(padding: const EdgeInsets.all(14), child: Row(children: [
-      Icon(Icons.receipt_long, color: Colors.indigo.shade700),
+      Icon(Icons.receipt_long, color: Colors.indigo.shade400),
       const SizedBox(width: 12),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(_vendorName ?? 'Invoice / Receipt',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.indigo.shade800)),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.indigo.shade200 : Colors.indigo.shade800)),
         const SizedBox(height: 2),
         Text('${_products.length} product(s) detected  •  Date: ${_extractedDate ?? 'N/A'}',
-            style: TextStyle(color: Colors.indigo.shade600, fontSize: 13)),
+            style: TextStyle(color: isDark ? Colors.indigo.shade300 : Colors.indigo.shade600, fontSize: 13)),
       ])),
       TextButton.icon(onPressed: _addRow, icon: const Icon(Icons.add, size: 16),
           label: const Text('Add Row')),
@@ -436,7 +558,11 @@ class _OcrScreenState extends State<OcrScreen> {
   );
 
   // ── Desktop table ──────────────────────────────────────────────────────
-  Widget _productTable() => Card(
+  Widget _productTable(bool isDark) {
+    final evenRow = isDark ? const Color(0xFF1E293B) : Colors.grey.shade50;
+    final oddRow = isDark ? const Color(0xFF0F172A) : Colors.white;
+
+    return Card(
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     child: Padding(padding: const EdgeInsets.all(12), child: Column(
       crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -454,16 +580,16 @@ class _OcrScreenState extends State<OcrScreen> {
           SizedBox(width: 90, child: Text(widget.mode == 'purchase' ? 'Stock In' : 'Units Sold', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
           const SizedBox(width: 36),
         ])),
-        const Divider(height: 1),
+        Divider(height: 1, color: isDark ? const Color(0xFF475569) : null),
         ...List.generate(_products.length, (i) {
           final p = _products[i];
           return Container(
-            color: i.isEven ? Colors.grey.shade50 : Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            color: i.isEven ? evenRow : oddRow,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Row(children: [
               SizedBox(width: 36, child: Checkbox(value: p.selected,
                   onChanged: (v) => setState(() => p.selected = v ?? true), activeColor: Colors.indigo)),
-              Expanded(flex: 3, child: _field(p.nameCtrl, 'Product name')),
+              Expanded(flex: 3, child: _field(p.nameCtrl, 'Product name', isDark: isDark)),
               const SizedBox(width: 8),
               Expanded(flex: 2, child: DropdownButtonFormField<String>(
                 initialValue: p.category,
@@ -472,15 +598,18 @@ class _OcrScreenState extends State<OcrScreen> {
                 onChanged: (v) => setState(() => p.category = v ?? 'General'),
                 decoration: InputDecoration(isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6))),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(color: isDark ? const Color(0xFF475569) : Colors.grey.shade400)),
+                    filled: isDark, fillColor: isDark ? const Color(0xFF334155) : null),
               )),
               const SizedBox(width: 8),
               if (widget.mode == 'purchase')
-                SizedBox(width: 100, child: _field(p.costPriceCtrl, '0.00', num: true, pre: '₹ '))
+                SizedBox(width: 100, child: _field(p.costPriceCtrl, '0.00', num: true, pre: '₹ ', isDark: isDark))
               else
-                SizedBox(width: 100, child: _field(p.sellingPriceCtrl, '0.00', num: true, pre: '₹ ')),
+                SizedBox(width: 100, child: _field(p.sellingPriceCtrl, '0.00', num: true, pre: '₹ ', isDark: isDark)),
               const SizedBox(width: 8),
-              SizedBox(width: 90, child: _field(p.quantityCtrl, '1', num: true)),
+              SizedBox(width: 90, child: _field(p.quantityCtrl, '1', num: true, isDark: isDark)),
               SizedBox(width: 36, child: IconButton(icon: Icon(Icons.delete_outline,
                   color: Colors.red.shade400, size: 18), onPressed: () => _removeRow(i), splashRadius: 16)),
             ]),
@@ -489,9 +618,10 @@ class _OcrScreenState extends State<OcrScreen> {
       ],
     )),
   );
+  }
 
   // ── Mobile cards ───────────────────────────────────────────────────────
-  Widget _productCards() => Column(
+  Widget _productCards(bool isDark) => Column(
     children: List.generate(_products.length, (i) {
       final p = _products[i];
       return Card(
@@ -503,12 +633,13 @@ class _OcrScreenState extends State<OcrScreen> {
               Checkbox(value: p.selected,
                   onChanged: (v) => setState(() => p.selected = v ?? true), activeColor: Colors.indigo),
               Expanded(child: Text(p.nameCtrl.text.isNotEmpty ? p.nameCtrl.text : 'Product ${i + 1}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  overflow: TextOverflow.ellipsis)),
               IconButton(icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 18),
                   onPressed: () => _removeRow(i)),
             ]),
             const SizedBox(height: 6),
-            _field(p.nameCtrl, 'Product name', lbl: 'Product Name'),
+            _field(p.nameCtrl, 'Product name', lbl: 'Product Name', isDark: isDark),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               initialValue: p.category,
@@ -516,20 +647,23 @@ class _OcrScreenState extends State<OcrScreen> {
               onChanged: (v) => setState(() => p.category = v ?? 'General'),
               decoration: InputDecoration(labelText: 'Category', isDense: true,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF475569) : Colors.grey.shade400)),
+                  filled: isDark, fillColor: isDark ? const Color(0xFF334155) : null),
             ),
             const SizedBox(height: 8),
             if (widget.mode == 'purchase')
               Row(children: [
-                Expanded(child: _field(p.costPriceCtrl, '0.00', lbl: 'Cost Price (CP)', num: true, pre: '₹ ')),
+                Expanded(child: _field(p.costPriceCtrl, '0.00', lbl: 'Cost Price (CP)', num: true, pre: '₹ ', isDark: isDark)),
                 const SizedBox(width: 8),
-                Expanded(child: _field(p.quantityCtrl, '1', lbl: 'Stock Qty', num: true)),
+                Expanded(child: _field(p.quantityCtrl, '1', lbl: 'Stock Qty', num: true, isDark: isDark)),
               ])
             else if (widget.mode == 'sale')
               Row(children: [
-                Expanded(child: _field(p.sellingPriceCtrl, '0.00', lbl: 'Selling Price (SP)', num: true, pre: '₹ ')),
+                Expanded(child: _field(p.sellingPriceCtrl, '0.00', lbl: 'Selling Price (SP)', num: true, pre: '₹ ', isDark: isDark)),
                 const SizedBox(width: 8),
-                Expanded(child: _field(p.quantityCtrl, '1', lbl: 'Units Sold', num: true)),
+                Expanded(child: _field(p.quantityCtrl, '1', lbl: 'Units Sold', num: true, isDark: isDark)),
               ]),
           ],
         )),
@@ -539,54 +673,40 @@ class _OcrScreenState extends State<OcrScreen> {
 
   // ── Text field helper ──────────────────────────────────────────────────
   Widget _field(TextEditingController c, String hint,
-      {bool num = false, String? pre, String? lbl}) => TextField(
+      {bool num = false, String? pre, String? lbl, bool isDark = false}) => TextField(
     controller: c,
     keyboardType: num ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
-    style: const TextStyle(fontSize: 13),
-    decoration: InputDecoration(hintText: hint, labelText: lbl, prefixText: pre, isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6))),
+    style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+    decoration: InputDecoration(
+      hintText: hint,
+      labelText: lbl,
+      prefixText: pre,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF475569) : Colors.grey.shade400),
+      ),
+      filled: isDark,
+      fillColor: isDark ? const Color(0xFF334155) : null,
+      hintStyle: TextStyle(color: isDark ? const Color(0xFF94A3B8) : null),
+      labelStyle: TextStyle(color: isDark ? const Color(0xFF94A3B8) : null),
+      prefixStyle: TextStyle(color: isDark ? Colors.white70 : null),
+    ),
   );
 
-  // ── Action buttons ─────────────────────────────────────────────────────
-  Widget _actionButtons() {
-    final n = _products.where((p) => p.selected).length;
-    return Row(children: [
-      Expanded(child: ElevatedButton.icon(
-        onPressed: _isSaving ? null : _saveToInventory,
-        icon: _isSaving
-            ? const SizedBox(width: 18, height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-            : const Icon(Icons.save),
-          label: Text(_isSaving
-            ? 'Saving…'
-            : (widget.mode == 'purchase'
-              ? 'Save $n Product(s) to Inventory'
-              : 'Save $n Sale Transaction(s)')),
-        style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-      )),
-      const SizedBox(width: 12),
-      OutlinedButton.icon(onPressed: _addRow, icon: const Icon(Icons.add), label: const Text('Add Row'),
-        style: OutlinedButton.styleFrom(foregroundColor: Colors.indigo,
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-      ),
-    ]);
-  }
-
   // ── No products placeholder ────────────────────────────────────────────
-  Widget _noProducts() => Card(
+  Widget _noProducts(bool isDark) => Card(
     margin: const EdgeInsets.only(top: 12),
     child: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
-      Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
+      Icon(Icons.search_off, size: 48, color: isDark ? Colors.white38 : Colors.grey.shade400),
       const SizedBox(height: 12),
       const Text('No products detected automatically',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
       const SizedBox(height: 8),
       Text('The text was extracted but no product lines were parsed.\nYou can add products manually.',
-          style: TextStyle(color: Colors.grey.shade600), textAlign: TextAlign.center),
+          style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600), textAlign: TextAlign.center),
       const SizedBox(height: 16),
       ElevatedButton.icon(onPressed: _addRow, icon: const Icon(Icons.add),
           label: const Text('Add Product Manually'),
@@ -595,16 +715,22 @@ class _OcrScreenState extends State<OcrScreen> {
   );
 
   // ── Raw text expander ──────────────────────────────────────────────────
-  Widget _rawTextExpander() => ExpansionTile(
-    leading: const Icon(Icons.text_snippet_outlined, color: Colors.grey),
-    title: const Text('Raw Extracted Text', style: TextStyle(fontSize: 14, color: Colors.grey)),
+  Widget _rawTextExpander(bool isDark) => ExpansionTile(
+    leading: Icon(Icons.text_snippet_outlined, color: isDark ? Colors.white38 : Colors.grey),
+    title: Text('Raw Extracted Text', style: TextStyle(fontSize: 14, color: isDark ? Colors.white54 : Colors.grey)),
     children: [
       Container(
         width: double.infinity, padding: const EdgeInsets.all(14),
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade200)),
-        child: SelectableText(_rawText!, style: const TextStyle(fontSize: 13, height: 1.5, fontFamily: 'monospace')),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF334155) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isDark ? const Color(0xFF475569) : Colors.grey.shade200),
+        ),
+        child: SelectableText(_rawText!, style: TextStyle(
+          fontSize: 13, height: 1.5, fontFamily: 'monospace',
+          color: isDark ? Colors.white70 : Colors.black87,
+        )),
       ),
     ],
   );

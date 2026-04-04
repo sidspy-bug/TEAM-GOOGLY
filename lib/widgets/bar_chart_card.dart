@@ -138,7 +138,7 @@ class BarChartCard extends StatelessWidget {
       children: [
         Container(width: 12, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey)),
       ],
     );
   }

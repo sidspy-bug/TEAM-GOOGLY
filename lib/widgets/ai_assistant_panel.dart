@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
 class AiAssistantPanel extends StatefulWidget {
   final VoidCallback onClose;
@@ -10,6 +11,8 @@ class AiAssistantPanel extends StatefulWidget {
 
 class _AiAssistantPanelState extends State<AiAssistantPanel> {
   final _msgCtrl = TextEditingController();
+  final _scrollController = ScrollController();
+  bool _isLoading = false;
   final List<Map<String, String>> _messages = [
     {'role': 'assistant', 'text': 'Hi! I\'m your GrowthOS AI assistant. Ask me about your sales, inventory, or business insights.'},
   ];
@@ -17,30 +20,64 @@ class _AiAssistantPanelState extends State<AiAssistantPanel> {
   @override
   void dispose() {
     _msgCtrl.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _send() {
-    final text = _msgCtrl.text.trim();
-    if (text.isEmpty) return;
-    setState(() {
-      _messages.add({'role': 'user', 'text': text});
-      _msgCtrl.clear();
-      // Mock AI response
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (mounted) {
-          setState(() {
-            _messages.add({
-              'role': 'assistant',
-              'text': _mockReply(text),
-            });
-          });
-        }
-      });
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
-  String _mockReply(String query) {
+  Future<void> _send() async {
+    final text = _msgCtrl.text.trim();
+    if (text.isEmpty || _isLoading) return;
+
+    setState(() {
+      _messages.add({'role': 'user', 'text': text});
+      _msgCtrl.clear();
+      _isLoading = true;
+    });
+    _scrollToBottom();
+
+    try {
+      // Try backend AI endpoint first
+      final response = await ApiService().post('/ai/chat', body: {
+        'message': text,
+      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _messages.add({
+            'role': 'assistant',
+            'text': response['reply']?.toString() ?? response['insight']?.toString() ?? 'I received your message but couldn\'t generate a response.',
+          });
+        });
+        _scrollToBottom();
+      }
+    } catch (_) {
+      // Fallback to rule-based response
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _messages.add({
+            'role': 'assistant',
+            'text': _fallbackReply(text),
+          });
+        });
+        _scrollToBottom();
+      }
+    }
+  }
+
+  String _fallbackReply(String query) {
     final q = query.toLowerCase();
     if (q.contains('sale') || q.contains('revenue')) {
       return 'Your total sales today are approximately ₹8,450. Tea and Samosa are the top sellers.';
@@ -59,24 +96,39 @@ class _AiAssistantPanelState extends State<AiAssistantPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final userBubble = isDark ? Colors.indigo.shade800 : Colors.indigo.shade100;
+    final assistantBubble = isDark ? const Color(0xFF334155) : Colors.grey.shade100;
+    final borderColor = isDark ? const Color(0xFF475569) : Colors.grey.shade300;
+    final hintColor = isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500;
+
     return Container(
-      width: 340,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(left: BorderSide(color: Colors.grey.shade300)),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8, offset: const Offset(-2, 0))],
-      ),
+      color: bgColor,
       child: Column(
         children: [
           // Header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            color: Colors.indigo,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.indigo.shade700, Colors.indigo.shade500],
+              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+            ),
             child: Row(
               children: [
                 const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
                 const SizedBox(width: 8),
-                const Expanded(child: Text('AI Assistant', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('AI Assistant', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text('Powered by Ollama', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                    ],
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white, size: 20),
                   onPressed: widget.onClose,
@@ -88,76 +140,164 @@ class _AiAssistantPanelState extends State<AiAssistantPanel> {
           ),
           // Messages
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: _messages.length,
-              itemBuilder: (context, i) {
-                final msg = _messages[i];
-                final isUser = msg['role'] == 'user';
-                return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    constraints: const BoxConstraints(maxWidth: 280),
-                    decoration: BoxDecoration(
-                      color: isUser ? Colors.indigo.shade100 : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
+            child: _messages.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.chat_bubble_outline, size: 48, color: hintColor),
+                        const SizedBox(height: 12),
+                        Text('Ask me anything about your store!', style: TextStyle(color: hintColor, fontSize: 14)),
+                      ],
                     ),
-                    child: Text(msg['text'] ?? '', style: const TextStyle(fontSize: 13)),
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(12),
+                    itemCount: _messages.length + (_isLoading ? 1 : 0),
+                    itemBuilder: (context, i) {
+                      // Loading indicator
+                      if (i == _messages.length && _isLoading) {
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            constraints: const BoxConstraints(maxWidth: 280),
+                            decoration: BoxDecoration(
+                              color: assistantBubble,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 16, height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: isDark ? Colors.indigo.shade300 : Colors.indigo,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text('Thinking...', style: TextStyle(fontSize: 13, color: hintColor)),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      final msg = _messages[i];
+                      final isUser = msg['role'] == 'user';
+                      return Align(
+                        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          constraints: const BoxConstraints(maxWidth: 280),
+                          decoration: BoxDecoration(
+                            color: isUser ? userBubble : assistantBubble,
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(12),
+                              topRight: const Radius.circular(12),
+                              bottomLeft: isUser ? const Radius.circular(12) : const Radius.circular(4),
+                              bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            msg['text'] ?? '',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? Colors.white : Colors.black87,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
+          // Quick suggestions
+          if (_messages.length <= 1)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _quickChip('📊 Sales today', isDark),
+                  _quickChip('📦 Low stock?', isDark),
+                  _quickChip('💡 Give me a tip', isDark),
+                  _quickChip('💰 Profit estimate', isDark),
+                ],
+              ),
+            ),
           // Input bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade300))),
+            decoration: BoxDecoration(
+              color: bgColor,
+              border: Border(top: BorderSide(color: borderColor)),
+            ),
             child: Row(
               children: [
-                IconButton(
-                  icon: Icon(Icons.attach_file, color: Colors.grey.shade600, size: 20),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload coming soon')));
-                  },
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                const SizedBox(width: 6),
                 Expanded(
                   child: TextField(
                     controller: _msgCtrl,
-                    decoration: const InputDecoration(
+                    enabled: !_isLoading,
+                    style: TextStyle(fontSize: 14, color: isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
                       hintText: 'Ask something...',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      hintStyle: TextStyle(color: hintColor),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF334155) : Colors.grey.shade50,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: borderColor),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: borderColor),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: Colors.indigo.shade300, width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       isDense: true,
                     ),
                     onSubmitted: (_) => _send(),
                   ),
                 ),
-                const SizedBox(width: 6),
-                IconButton(
-                  icon: Icon(Icons.mic, color: Colors.grey.shade600, size: 20),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice input coming soon')));
-                  },
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: const Icon(Icons.send, color: Colors.indigo, size: 20),
-                  onPressed: _send,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+                const SizedBox(width: 8),
+                Material(
+                  color: _isLoading ? Colors.grey : Colors.indigo,
+                  borderRadius: BorderRadius.circular(24),
+                  child: InkWell(
+                    onTap: _isLoading ? null : _send,
+                    borderRadius: BorderRadius.circular(24),
+                    child: const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: Icon(Icons.send, color: Colors.white, size: 20),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _quickChip(String label, bool isDark) {
+    return ActionChip(
+      label: Text(label, style: TextStyle(fontSize: 12, color: isDark ? Colors.white : Colors.indigo.shade700)),
+      backgroundColor: isDark ? const Color(0xFF334155) : Colors.indigo.shade50,
+      side: BorderSide(color: isDark ? const Color(0xFF475569) : Colors.indigo.shade100),
+      onPressed: () {
+        _msgCtrl.text = label.replaceAll(RegExp(r'[^\w\s?]'), '').trim();
+        _send();
+      },
     );
   }
 }

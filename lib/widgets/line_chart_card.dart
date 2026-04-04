@@ -141,7 +141,7 @@ class LineChartCard extends StatelessWidget {
       children: [
         Container(width: 12, height: 3, color: color),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey)),
       ],
     );
   }

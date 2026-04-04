@@ -11,11 +11,17 @@ class SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = color != null
+        ? (isDark ? Color.alphaBlend(color!.withValues(alpha: 0.15), const Color(0xFF1E293B)) : color!)
+        : (isDark ? const Color(0xFF1E293B) : Colors.white);
+    final titleColor = isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Card(
-        color: color ?? Colors.white,
+        color: cardBg,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
@@ -30,7 +36,7 @@ class SummaryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(title, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                    Text(title, style: TextStyle(fontSize: 11, color: titleColor)),
                     const SizedBox(height: 4),
                     Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   ],

@@ -28,6 +28,10 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 const LOW_STOCK_THRESHOLD = 5;
 
+// Ollama config
+const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:7b";
+
 /* =====================
    BASIC ROUTES
 ===================== */
@@ -400,7 +404,7 @@ app.get("/analytics/weekly-chart", verifyToken, (req, res) => {
 });
 
 /* =====================
-   AI INSIGHT (MVP)
+   AI INSIGHT (Rule-based MVP)
 ===================== */
 
 app.get("/ai/insights", verifyToken, (req, res) => {
@@ -424,6 +428,188 @@ app.get("/ai/insights", verifyToken, (req, res) => {
   }
 
   res.json({ insight });
+});
+
+/* =====================
+   AI CHAT (Ollama Integration)
+===================== */
+
+// Helper: gather shop context for AI
+function getShopContext(uid) {
+  const topProducts = db.prepare(`
+    SELECT p.product_name, SUM(t.units_sold) AS totalSold, SUM(t.revenue) AS totalRevenue
+    FROM transactions t JOIN products p ON p.id = t.product_id
+    WHERE t.user_id = ?
+    GROUP BY t.product_id ORDER BY totalRevenue DESC LIMIT 5
+  `).all(uid);
+
+  const lowStock = db.prepare(`
+    SELECT p.product_name, i.current_stock
+    FROM inventory i JOIN products p ON p.id = i.product_id
+    WHERE i.user_id = ? AND i.current_stock < ?
+    ORDER BY i.current_stock ASC LIMIT 5
+  `).all(uid, LOW_STOCK_THRESHOLD);
+
+  const totals = db.prepare(`
+    SELECT COALESCE(SUM(revenue), 0) AS totalRevenue, COALESCE(SUM(profit), 0) AS totalProfit,
+           COALESCE(SUM(units_sold), 0) AS totalUnitsSold
+    FROM transactions WHERE user_id = ?
+  `).get(uid);
+
+  const productCount = db.prepare("SELECT COUNT(*) AS count FROM products WHERE user_id = ?").get(uid);
+
+  return {
+    totalRevenue: totals.totalRevenue,
+    totalProfit: totals.totalProfit,
+    totalUnitsSold: totals.totalUnitsSold,
+    totalProducts: productCount.count,
+    topProducts: topProducts.map(p => `${p.product_name} (sold: ${p.totalSold}, revenue: ₹${p.totalRevenue})`),
+    lowStockItems: lowStock.map(p => `${p.product_name} (stock: ${p.current_stock})`),
+  };
+}
+
+// Rule-based fallback response
+function getRuleBasedResponse(message, context) {
+  const q = message.toLowerCase();
+
+  if (q.includes('sale') || q.includes('revenue')) {
+    return `Your total revenue is ₹${context.totalRevenue.toFixed(0)}. ${context.topProducts.length > 0 ? `Top seller: ${context.topProducts[0]}` : 'Start selling to see insights!'}`;
+  }
+  if (q.includes('profit')) {
+    return `Estimated total profit: ₹${context.totalProfit.toFixed(0)}. Keep monitoring your cost prices to maintain healthy margins.`;
+  }
+  if (q.includes('stock') || q.includes('inventory')) {
+    if (context.lowStockItems.length > 0) {
+      return `⚠️ Low stock alert: ${context.lowStockItems.join(', ')}. Consider restocking these items soon.`;
+    }
+    return 'All products are well-stocked! No immediate restocking needed.';
+  }
+  if (q.includes('suggest') || q.includes('tip') || q.includes('insight')) {
+    const tips = [
+      context.topProducts.length > 0 ? `Bundle your top seller with slower movers to increase average order value.` : null,
+      context.lowStockItems.length > 0 ? `Restock ${context.lowStockItems[0]} urgently to avoid lost sales.` : null,
+      `Review your pricing quarterly to stay competitive while maintaining margins.`,
+      `Track your daily sales patterns to optimize stock levels.`,
+    ].filter(Boolean);
+    return tips[Math.floor(Math.random() * tips.length)];
+  }
+
+  return `You have ${context.totalProducts} products, total revenue of ₹${context.totalRevenue.toFixed(0)}, and profit of ₹${context.totalProfit.toFixed(0)}. ${context.lowStockItems.length > 0 ? `⚠️ ${context.lowStockItems.length} items are low on stock.` : '✅ All stock levels are healthy.'} Ask me about sales, profit, stock, or suggestions!`;
+}
+
+// POST /ai/chat — Ollama-powered chat with fallback
+app.post("/ai/chat", verifyToken, async (req, res) => {
+  const uid = req.user.uid;
+  const { message } = req.body;
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ error: "Message is required" });
+  }
+
+  const context = getShopContext(uid);
+
+  // Try Ollama first
+  try {
+    const shopDataPrompt = `You are a helpful business assistant for a small Indian retail shop. Here is the shop data:
+- Total Revenue: ₹${context.totalRevenue.toFixed(0)}
+- Total Profit: ₹${context.totalProfit.toFixed(0)}
+- Total Units Sold: ${context.totalUnitsSold}
+- Total Products: ${context.totalProducts}
+- Top Products: ${context.topProducts.join(', ') || 'No sales yet'}
+- Low Stock Items: ${context.lowStockItems.join(', ') || 'None'}
+
+User question: ${message}
+
+Give a concise, actionable response in 2-3 sentences. Focus on practical advice. Use ₹ for currency.`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+    const ollamaResponse = await fetch(`${OLLAMA_URL}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        prompt: shopDataPrompt,
+        stream: false,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!ollamaResponse.ok) {
+      throw new Error(`Ollama returned ${ollamaResponse.status}`);
+    }
+
+    const data = await ollamaResponse.json();
+    const reply = data.response || data.message || '';
+
+    if (reply.trim()) {
+      console.log(`✅ Ollama (${OLLAMA_MODEL}) responded successfully`);
+      return res.json({ reply: reply.trim(), source: 'ollama' });
+    }
+
+    throw new Error('Empty Ollama response');
+  } catch (err) {
+    console.warn(`⚠️ Ollama unavailable (${err.message}), using rule-based fallback`);
+  }
+
+  // Fallback to rule-based
+  const fallbackReply = getRuleBasedResponse(message, context);
+  res.json({ reply: fallbackReply, source: 'rule-based' });
+});
+
+// POST /ai/insights — Ollama-powered insights with fallback
+app.post("/ai/insights", verifyToken, async (req, res) => {
+  const uid = req.user.uid;
+  const context = getShopContext(uid);
+
+  try {
+    const prompt = `Analyze this small Indian retail shop data and give exactly 3 actionable insights:
+- Total Revenue: ₹${context.totalRevenue.toFixed(0)}
+- Total Profit: ₹${context.totalProfit.toFixed(0)}
+- Top Products: ${context.topProducts.join(', ') || 'No sales yet'}
+- Low Stock Items: ${context.lowStockItems.join(', ') || 'None'}
+
+Format as:
+1. Top selling product insight
+2. Low stock alert or inventory suggestion
+3. One improvement suggestion
+
+Keep each insight to 1 sentence. Use ₹ for currency.`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const ollamaResponse = await fetch(`${OLLAMA_URL}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        prompt,
+        stream: false,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (ollamaResponse.ok) {
+      const data = await ollamaResponse.json();
+      if (data.response && data.response.trim()) {
+        console.log(`✅ Ollama insights generated successfully`);
+        return res.json({ insight: data.response.trim(), source: 'ollama' });
+      }
+    }
+    throw new Error('Ollama unavailable');
+  } catch (err) {
+    console.warn(`⚠️ Ollama insights fallback: ${err.message}`);
+  }
+
+  // Fallback
+  const fallbackInsight = getRuleBasedResponse('give insights', context);
+  res.json({ insight: fallbackInsight, source: 'rule-based' });
 });
 
 /* =====================
@@ -451,8 +637,8 @@ app.post("/ocr/scan", verifyToken, async (req, res) => {
 
     // Try to extract a date from the text
     const dateMatch = rawText.match(
-      /(?:date|dated?|dt)[:\s]*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i
-    ) || rawText.match(/(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/);
+      /(?:date|dated?|dt)[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i
+    ) || rawText.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
     const extractedDate = dateMatch ? dateMatch[1] : new Date().toISOString().split("T")[0];
 
     // Try to extract vendor / shop name (first non-empty line)
@@ -551,4 +737,5 @@ function cleanName(name) {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Ollama: ${OLLAMA_URL} | Model: ${OLLAMA_MODEL}`);
 });

@@ -4,23 +4,44 @@ import '../models/dashboard_summary.dart';
 import 'sales_repository.dart';
 
 class DummySalesRepository implements SalesRepository {
-  // Product catalog: [id, name, category, sellingPrice, costPrice, stock]
+  // Diversified product catalog: [id, name, category, sellingPrice, costPrice, stock]
+  // Includes high sellers, low sellers, low stock, high stock, medium items
   static final _catalog = [
+    // HIGH SELLERS — popular, fast-moving
     ['P001', 'Tea', 'Beverages', 30.0, 12.0, 120],
-    ['P002', 'Coffee', 'Beverages', 50.0, 22.0, 80],
-    ['P003', 'Samosa', 'Snacks', 15.0, 6.0, 200],
-    ['P004', 'Chips', 'Snacks', 20.0, 10.0, 150],
-    ['P005', 'Soap', 'Essentials', 45.0, 20.0, 60],
-    ['P006', 'Shampoo', 'Essentials', 120.0, 55.0, 35],
-    ['P007', 'Notebook', 'Stationery', 40.0, 18.0, 90],
-    ['P008', 'Pen', 'Stationery', 10.0, 4.0, 300],
-    ['P009', 'Biscuits', 'Snacks', 25.0, 11.0, 180],
-    ['P010', 'Juice', 'Beverages', 35.0, 15.0, 70],
-    ['P011', 'Bread', 'Bakery', 30.0, 14.0, 45],
-    ['P012', 'Butter', 'Dairy', 55.0, 30.0, 8],
+    ['P002', 'Samosa', 'Snacks', 15.0, 6.0, 200],
+    ['P003', 'Biscuits', 'Snacks', 25.0, 11.0, 180],
+    // MEDIUM SELLERS
+    ['P004', 'Coffee', 'Beverages', 50.0, 22.0, 65],
+    ['P005', 'Chips', 'Snacks', 20.0, 10.0, 90],
+    ['P006', 'Notebook', 'Stationery', 40.0, 18.0, 55],
+    ['P007', 'Juice', 'Beverages', 35.0, 15.0, 70],
+    ['P008', 'Bread', 'Bakery', 30.0, 14.0, 45],
+    // LOW SELLERS — slow-moving
+    ['P009', 'Pen', 'Stationery', 10.0, 4.0, 300],
+    ['P010', 'Soap', 'Personal Care', 45.0, 20.0, 40],
+    // LOW STOCK — below threshold
+    ['P011', 'Butter', 'Dairy', 55.0, 30.0, 3],
+    ['P012', 'Shampoo', 'Personal Care', 120.0, 55.0, 2],
+    ['P013', 'Cooking Oil', 'Grocery', 180.0, 140.0, 4],
+    // HIGH STOCK
+    ['P014', 'Sugar (1kg)', 'Grocery', 48.0, 38.0, 250],
+    ['P015', 'Rice (1kg)', 'Grocery', 65.0, 50.0, 180],
+    // PREMIUM ITEMS
+    ['P016', 'Milk (1L)', 'Dairy', 32.0, 26.0, 30],
+    ['P017', 'Detergent', 'Personal Care', 95.0, 60.0, 12],
+    ['P018', 'Maggi Noodles', 'Snacks', 14.0, 10.0, 160],
   ];
 
   static const _modes = ['UPI', 'Cash', 'Card'];
+
+  // Per-product quantity weights to create realistic distribution
+  static const _qtyWeights = {
+    'Tea': 8, 'Samosa': 7, 'Biscuits': 5,       // HIGH sellers
+    'Coffee': 3, 'Chips': 3, 'Notebook': 2,      // MEDIUM
+    'Juice': 2, 'Bread': 3, 'Maggi Noodles': 4,  // MEDIUM
+    'Pen': 1, 'Soap': 1,                          // LOW sellers
+  };
 
   @override
   Future<List<Sale>> getSales() async {
@@ -28,21 +49,21 @@ class DummySalesRepository implements SalesRepository {
     final rand = Random(42);
     final List<Sale> list = [];
 
-    for (var i = 0; i < 120; i++) {
+    for (var i = 0; i < 140; i++) {
       final p = _catalog[rand.nextInt(_catalog.length)];
-      final qty = rand.nextInt(6) + 1;
-      final date = now.subtract(Duration(days: rand.nextInt(14)));
+      final productName = p[1] as String;
+      final maxQty = _qtyWeights[productName] ?? 3;
+      final qty = rand.nextInt(maxQty) + 1;
+      final date = now.subtract(Duration(days: rand.nextInt(14), hours: rand.nextInt(12)));
       final mode = _modes[rand.nextInt(_modes.length)];
-      final rawStock = (p[5] as int) - rand.nextInt(20);
+      final rawStock = (p[5] as int) - rand.nextInt(15);
       final clampedStock = rawStock < 0 ? 0 : rawStock;
-      // Ensure units sold never exceeds available stock
-      final maxQty = clampedStock + qty; // opening stock approximation
-      final validQty = qty <= maxQty ? qty : maxQty;
+
       list.add(Sale(
         productId: p[0] as String,
-        productName: p[1] as String,
+        productName: productName,
         category: p[2] as String,
-        quantity: validQty,
+        quantity: qty,
         price: (p[3] as double),
         costPrice: (p[4] as double),
         currentStock: clampedStock,

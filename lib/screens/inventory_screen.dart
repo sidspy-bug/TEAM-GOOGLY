@@ -61,6 +61,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingBg = isDark ? const Color(0xFF334155) : Colors.indigo.shade50;
+    final lowStockBg = isDark ? Colors.red.shade900.withValues(alpha: 0.3) : Colors.red.shade50;
+
     return Stack(
       children: [
         FutureBuilder<List<Sale>>(
@@ -82,7 +86,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 children: [
                   Text(l.inventory, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const Spacer(),
-                  Text('${products.length} ${l.productsLabel}', style: TextStyle(color: Colors.grey.shade600)),
+                  Text('${products.length} ${l.productsLabel}', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -90,7 +94,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
-                    headingRowColor: WidgetStateProperty.all(Colors.indigo.shade50),
+                    headingRowColor: WidgetStateProperty.all(headingBg),
                     columns: [
                       DataColumn(label: Text(l.idLabel, style: const TextStyle(fontWeight: FontWeight.bold))),
                       DataColumn(label: Text(l.product, style: const TextStyle(fontWeight: FontWeight.bold))),
@@ -108,19 +112,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       final isLow = clampedStock < 15;
                       final wasNegative = p.currentStock < 0;
                       return DataRow(
-                        color: isLow ? WidgetStateProperty.all(Colors.red.shade50) : null,
+                        color: isLow ? WidgetStateProperty.all(lowStockBg) : null,
                         cells: [
                           DataCell(Text(p.productId)),
                           DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
                             Text(p.productName),
-                            if (isLow) ...[const SizedBox(width: 6), const Icon(Icons.warning_amber, size: 16, color: Colors.red)],
+                            if (isLow) ...[const SizedBox(width: 6), Icon(Icons.warning_amber, size: 16, color: Colors.red.shade400)],
                             if (wasNegative) ...[const SizedBox(width: 4), Tooltip(message: 'Stock was negative, clamped to 0', child: Icon(Icons.error_outline, size: 16, color: Colors.orange.shade700))],
                           ])),
                           DataCell(Text(p.category)),
                           DataCell(Text('${p.date.day}/${p.date.month}/${p.date.year}')),
                           DataCell(Text('${p.quantity}')),
                           DataCell(Text('$clampedStock', style: TextStyle(
-                            color: isLow ? Colors.red : null,
+                            color: isLow ? Colors.red.shade400 : null,
                             fontWeight: isLow ? FontWeight.bold : null,
                           ))),
                           DataCell(Text('₹${p.price.toStringAsFixed(0)}')),
@@ -128,7 +132,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           DataCell(Text('₹${p.dailyRevenue.toStringAsFixed(0)}')),
                           DataCell(Text('₹${p.estimatedProfit.toStringAsFixed(0)}',
                             style: TextStyle(
-                              color: p.estimatedProfit >= 0 ? Colors.green.shade700 : Colors.red,
+                              color: p.estimatedProfit >= 0 ? Colors.green.shade400 : Colors.red.shade400,
                               fontWeight: FontWeight.w600,
                             ),
                           )),

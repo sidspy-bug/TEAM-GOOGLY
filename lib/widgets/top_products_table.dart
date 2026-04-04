@@ -8,6 +8,9 @@ class TopProductsTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final top10 = products.take(10).toList();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingBg = isDark ? const Color(0xFF334155) : Colors.indigo.shade50;
+    final topBg = isDark ? Colors.green.shade900.withValues(alpha: 0.2) : Colors.green.shade50;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -24,7 +27,7 @@ class TopProductsTable extends StatelessWidget {
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
                     child: DataTable(
                 columnSpacing: 20,
-                headingRowColor: WidgetStateProperty.all(Colors.indigo.shade50),
+                headingRowColor: WidgetStateProperty.all(headingBg),
                 columns: const [
                   DataColumn(label: Text('Product', style: TextStyle(fontWeight: FontWeight.bold))),
                   DataColumn(label: Text('Category', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -38,7 +41,7 @@ class TopProductsTable extends StatelessWidget {
                   final p = entry.value;
                   final isTopProfit = entry.key < 3;
                   return DataRow(
-                    color: isTopProfit ? WidgetStateProperty.all(Colors.green.shade50) : null,
+                    color: isTopProfit ? WidgetStateProperty.all(topBg) : null,
                     cells: [
                     DataCell(Row(children: [
                       Text(p.productName),
@@ -52,7 +55,7 @@ class TopProductsTable extends StatelessWidget {
                     DataCell(Text(
                       '₹${p.estimatedProfit.toStringAsFixed(0)}',
                       style: TextStyle(
-                        color: p.estimatedProfit >= 0 ? Colors.green.shade700 : Colors.red,
+                        color: p.estimatedProfit >= 0 ? Colors.green.shade400 : Colors.red.shade400,
                         fontWeight: FontWeight.w600,
                       ),
                     )),

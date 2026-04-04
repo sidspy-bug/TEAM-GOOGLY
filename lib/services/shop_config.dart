@@ -30,6 +30,8 @@ class ShopConfig {
 
   /// Load config for a specific user UID.
   /// Tries backend first, falls back to local SharedPreferences cache.
+  /// Also auto-marks returning users as onboarded if they have products or
+  /// a display name set (fixes re-onboarding after logout/login).
   Future<void> loadForUser(String uid) async {
     _uid = uid;
     final prefs = await SharedPreferences.getInstance();
@@ -41,6 +43,28 @@ class ShopConfig {
       _onboarded = data['onboarded'] == true;
       avatarIndex.value = data['avatarIndex'] ?? -1;
 
+      // Auto-detect returning user: if backend says not onboarded but
+      // user has a shop name or products, skip onboarding
+      if (!_onboarded) {
+        final hasCustomShop = shopName.value != 'My Shop' && shopName.value.isNotEmpty;
+        if (hasCustomShop) {
+          debugPrint('[ShopConfig] Returning user detected (shop name: ${shopName.value}). Auto-marking onboarded.');
+          _onboarded = true;
+          // Sync to backend
+          try { await ApiService().put('/user/settings', body: {'onboarded': true}); } catch (_) {}
+        } else {
+          // Check if user has products (another sign of a returning user)
+          try {
+            final products = await ApiService().get('/products/list');
+            if (products is List && products.isNotEmpty) {
+              debugPrint('[ShopConfig] Returning user detected (${products.length} products). Auto-marking onboarded.');
+              _onboarded = true;
+              try { await ApiService().put('/user/settings', body: {'onboarded': true}); } catch (_) {}
+            }
+          } catch (_) {}
+        }
+      }
+
       // Cache locally
       await prefs.setString(_keyShopName, shopName.value);
       await prefs.setBool(_keyOnboarded, _onboarded);
@@ -48,6 +72,7 @@ class ShopConfig {
       return;
     } catch (_) {
       // Backend unavailable — fall back to local cache
+      debugPrint('[ShopConfig] Backend unavailable, using local cache');
     }
 
     shopName.value = prefs.getString(_keyShopName) ?? 'My Shop';

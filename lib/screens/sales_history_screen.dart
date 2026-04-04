@@ -56,6 +56,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Stack(
       children: [
         FutureBuilder<List<Sale>>(
@@ -127,21 +128,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               // Summary card
               if (sales.isNotEmpty)
                 Card(
-                  color: Colors.indigo.shade50,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.indigo.shade50,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
                       children: [
-                        Icon(Icons.receipt_long, color: Colors.indigo.shade600, size: 22),
+                        Icon(Icons.receipt_long, color: Colors.indigo.shade400, size: 22),
                         const SizedBox(width: 12),
                         Text(
                           '${l.totalLabel}: ₹${sales.fold<double>(0, (sum, s) => sum + s.dailyRevenue).toStringAsFixed(0)}',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.indigo.shade800),
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.indigo.shade200 : Colors.indigo.shade800),
                         ),
                         const SizedBox(width: 24),
                         Text(
                           '${sales.length} ${AppLocalizations.of(context).transactionsLabel}',
-                          style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                          style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade700),
                         ),
                       ],
                     ),
@@ -172,18 +173,18 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.indigo.shade50,
+                          color: isDark ? const Color(0xFF1E293B) : Colors.indigo.shade50,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
                           children: [
                             Icon(Icons.calendar_today, size: 16, color: Colors.indigo.shade600),
                             const SizedBox(width: 8),
-                            Text(dateLabel, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo.shade700)),
+                            Text(dateLabel, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.indigo.shade200 : Colors.indigo.shade700)),
                             const Spacer(),
-                            Text('${l.revenueLabel}: ₹${dayRevenue.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                            Text('${l.revenueLabel}: ₹${dayRevenue.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade700)),
                             const SizedBox(width: 12),
-                            Text('${l.profitLabel}: ₹${dayProfit.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: dayProfit >= 0 ? Colors.green.shade700 : Colors.red)),
+                            Text('${l.profitLabel}: ₹${dayProfit.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: dayProfit >= 0 ? Colors.green.shade400 : Colors.red.shade400)),
                           ],
                         ),
                       ),
@@ -193,7 +194,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           scrollDirection: Axis.horizontal,
                           child: DataTable(
                             columnSpacing: 24,
-                            headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
+                            headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF334155) : Colors.grey.shade50),
                             columns: [
                               DataColumn(label: Text(l.dateLabel, style: const TextStyle(fontWeight: FontWeight.bold))),
                               DataColumn(label: Text(l.product, style: const TextStyle(fontWeight: FontWeight.bold))),

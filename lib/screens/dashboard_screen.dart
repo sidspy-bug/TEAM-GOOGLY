@@ -227,33 +227,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildKpiCards(DashboardSummary summary, bool isDesktop, bool isTablet) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cards = [
       SummaryCard(
         title: 'Total Sales',
         value: '₹${summary.totalSales.toStringAsFixed(0)}',
         icon: Icons.storefront,
-        color: Colors.blue.shade50,
+        color: isDark ? Colors.blue.shade900.withValues(alpha: 0.3) : Colors.blue.shade50,
         onTap: () => _showCardDetails(0, summary),
       ),
       SummaryCard(
         title: 'Estimated Profit',
         value: '₹${summary.estimatedProfit.toStringAsFixed(0)}',
         icon: Icons.trending_up,
-        color: Colors.green.shade50,
+        color: isDark ? Colors.green.shade900.withValues(alpha: 0.3) : Colors.green.shade50,
         onTap: () => _showCardDetails(1, summary),
       ),
       SummaryCard(
         title: 'Low Stock',
         value: '${summary.lowStockCount}',
         icon: Icons.warning_amber_rounded,
-        color: Colors.orange.shade50,
+        color: isDark ? Colors.orange.shade900.withValues(alpha: 0.3) : Colors.orange.shade50,
         onTap: () => _showCardDetails(2, summary),
       ),
       SummaryCard(
         title: 'Units Sold',
         value: '${summary.unitsSold}',
         icon: Icons.shopping_cart,
-        color: Colors.purple.shade50,
+        color: isDark ? Colors.purple.shade900.withValues(alpha: 0.3) : Colors.purple.shade50,
         onTap: () => _showCardDetails(3, summary),
       ),
     ];
