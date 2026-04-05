@@ -13,6 +13,7 @@ class RevenueTrendCard extends StatelessWidget {
 
   String _formatRupee(double v) {
     if (v >= 1000) return '₹${(v / 1000).toStringAsFixed(1)}K';
+    if (v == 0) return '0';
     return '₹${v.toStringAsFixed(0)}';
   }
 
@@ -48,9 +49,9 @@ class RevenueTrendCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 const Text('Sales vs Profit Trend', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const Spacer(),
-                _legend(Colors.green, 'Sales'),
+                _legend(Colors.indigo.shade400, 'Sales'),
                 const SizedBox(width: 12),
-                _legend(Colors.blue, 'Profit'),
+                _legend(Colors.teal.shade400, 'Profit'),
               ],
             ),
             const SizedBox(height: 16),
@@ -60,7 +61,32 @@ class RevenueTrendCard extends StatelessWidget {
                 LineChartData(
                   maxY: maxY,
                   minY: 0,
-                  gridData: const FlGridData(show: true, drawVerticalLine: false),
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      tooltipBgColor: isDark ? const Color(0xFF334155) : Colors.white70,
+                      tooltipRoundedRadius: 8,
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          return LineTooltipItem(
+                            _formatRupee(spot.y),
+                            TextStyle(
+                              color: spot.barIndex == 0 ? Colors.indigo : Colors.teal,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          );
+                        }).toList();
+                      },
+                    ),
+                  ),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: isDark ? Colors.white10 : Colors.black12,
+                      strokeWidth: 1,
+                    ),
+                  ),
                   titlesData: FlTitlesData(
                     rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -68,7 +94,10 @@ class RevenueTrendCard extends StatelessWidget {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 45,
-                        getTitlesWidget: (v, meta) => Text(_formatRupee(v), style: const TextStyle(fontSize: 9)),
+                        getTitlesWidget: (v, meta) => Text(
+                          _formatRupee(v),
+                          style: TextStyle(fontSize: 9, color: Colors.grey.shade500),
+                        ),
                       ),
                     ),
                     bottomTitles: AxisTitles(
@@ -79,7 +108,10 @@ class RevenueTrendCard extends StatelessWidget {
                           final idx = v.toInt();
                           if (idx < 0 || idx >= entries.length || idx % 2 != 0) return const SizedBox.shrink();
                           final dt = DateTime.tryParse(entries[idx].key);
-                          return Text(dt != null ? '${dt.day}/${dt.month}' : '', style: const TextStyle(fontSize: 9));
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(dt != null ? '${dt.day}/${dt.month}' : '', style: TextStyle(fontSize: 9, color: Colors.grey.shade500)),
+                          );
                         },
                       ),
                     ),
@@ -88,21 +120,50 @@ class RevenueTrendCard extends StatelessWidget {
                     LineChartBarData(
                       spots: salesSpots,
                       isCurved: true,
-                      color: Colors.green,
+                      curveSmoothness: 0.35,
+                      color: Colors.indigo.shade400,
                       barWidth: 3,
-                      dotData: const FlDotData(show: true),
-                      belowBarData: BarAreaData(show: true, color: Colors.green.withValues(alpha: 0.1)),
+                      isStrokeCapRound: true,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.indigo.shade400.withValues(alpha: 0.2),
+                            Colors.indigo.shade400.withValues(alpha: 0.0),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
                     ),
                     LineChartBarData(
                       spots: profitSpots,
                       isCurved: true,
-                      color: Colors.blue,
+                      curveSmoothness: 0.35,
+                      color: Colors.teal.shade400,
                       barWidth: 3,
-                      dotData: const FlDotData(show: true),
-                      belowBarData: BarAreaData(show: true, color: Colors.blue.withValues(alpha: 0.1)),
+                      isStrokeCapRound: true,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.teal.shade400.withValues(alpha: 0.2),
+                            Colors.teal.shade400.withValues(alpha: 0.0),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
                     ),
                   ],
-                  borderData: FlBorderData(show: true, border: Border(bottom: BorderSide(color: isDark ? Colors.white12 : Colors.black12))),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border(
+                      bottom: BorderSide(color: isDark ? Colors.white12 : Colors.black12),
+                    ),
+                  ),
                 ),
               ),
             ),

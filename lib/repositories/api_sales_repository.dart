@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import '../models/sale.dart';
 import '../models/dashboard_summary.dart';
 import '../services/api_service.dart';
@@ -15,11 +16,13 @@ class ApiSalesRepository implements SalesRepository {
   // Cached data per page load
   List<Sale>? _cachedSales;
   DashboardSummary? _cachedSummary;
+  Map<String, String>? _cachedAiInsight;
 
   /// Clear caches (call on logout or manual refresh).
   void clearCache() {
     _cachedSales = null;
     _cachedSummary = null;
+    _cachedAiInsight = null;
   }
 
   @override
@@ -129,112 +132,65 @@ class ApiSalesRepository implements SalesRepository {
     if (_cachedSummary != null) return _cachedSummary!;
 
     try {
-      // Fetch dashboard summary and analytics in parallel
+      // Fetch dashboard summary and overall trend in parallel
       final results = await Future.wait([
         _fetchSummaryEndpoint(),
-        _api.get('/analytics/daily'),
-        getSales(), // also fetches products + inventory
+        _api.get('/analytics/overall-trend'),
+        getSales(), // still useful for low stock / category stats
       ]);
 
       final summaryData = results[0] as Map<String, dynamic>;
-      final analyticsData = results[1] as Map<String, dynamic>;
+      final trendData = results[1] as List<dynamic>;
       final sales = results[2] as List<Sale>;
 
-      final totalSales = _toDouble(summaryData['totalRevenue'] ?? summaryData['dailyRevenue'] ?? 0);
-      final totalProfit = _toDouble(summaryData['totalProfit'] ?? summaryData['dailyProfit'] ?? 0);
+      final totalSales = _toDouble(summaryData['totalRevenue'] ?? 0);
+      final totalProfit = _toDouble(summaryData['totalProfit'] ?? 0);
       final lowStockCount = _toInt(summaryData['lowStockCount'] ?? 0);
-      final unitsSold = _toInt(summaryData['totalTransactions'] ?? summaryData['unitsSold'] ?? 0);
+      final unitsSold = _toInt(summaryData['unitsSold'] ?? 0);
 
-      final dailyRevenue = _toDouble(analyticsData['dailyRevenue'] ?? 0);
-      final dailyProfit = _toDouble(analyticsData['dailyProfit'] ?? 0);
-
-      // Build aggregated data from sales list
-      final Map<String, double> categorySales = {};
-      final Map<String, Map<String, int>> soldVsStock = {};
-      int computedLowStock = 0;
-
-      final oldestDate = sales.isNotEmpty 
-          ? sales.map((s) => s.date).reduce((a, b) => a.isBefore(b) ? a : b) 
-          : DateTime.now();
-      final diffDays = DateTime.now().difference(oldestDate).inDays;
-      final numberOfDays = diffDays > 0 ? diffDays : 14; 
-
-      final Map<String, Sale> perProduct = {};
-      for (final s in sales) {
-        final key = s.productId;
-        if (!perProduct.containsKey(key)) {
-          perProduct[key] = s;
-        } else {
-          final prev = perProduct[key]!;
-          perProduct[key] = Sale(
-            productId: s.productId,
-            productName: s.productName,
-            category: s.category,
-            quantity: prev.quantity + s.quantity,
-            price: s.quantity > 0 ? s.price : prev.price,
-            costPrice: s.costPrice > 0 ? s.costPrice : prev.costPrice,
-            currentStock: s.currentStock,
-            date: s.date.isAfter(prev.date) ? s.date : prev.date,
-            transactionMode: s.transactionMode,
-          );
-        }
-      }
-
-      final List<Sale> isolatedLowStockProducts = [];
-
-      for (final s in perProduct.values) {
-        categorySales[s.category] = (categorySales[s.category] ?? 0) + s.dailyRevenue;
-        soldVsStock[s.productName] = {
-          'sold': s.quantity,
-          'stock': s.currentStock,
-        };
-
-        // Dynamic threshold: avgDaily * 3 or minimum of 3
-        final avgDaily = s.quantity / numberOfDays;
-        final threshold = (avgDaily * 3).ceil();
-        final actualThreshold = threshold > 3 ? threshold : 3;
-        
-        if (s.currentStock <= actualThreshold) {
-           computedLowStock++;
-           isolatedLowStockProducts.add(s);
-        }
-      }
-
-      // Sort by quantity for top/low products
-      final sorted = List<Sale>.from(perProduct.values)..sort((a, b) => b.quantity.compareTo(a.quantity));
-      final topProducts = sorted.take(3).toList();
-      final lowProducts = isolatedLowStockProducts
-        ..sort((a, b) => a.currentStock.compareTo(b.currentStock));
-
-      // Build salesOverTime and costOverTime dynamically over actual history dates
+      // Build chart data directly from the trend data
       final Map<String, double> salesOverTime = {};
       final Map<String, double> costOverTime = {};
       
-      // If no valid sales exist, fill today with zero
-      if (sales.isEmpty) {
-        final dateKey = DateTime.now().toIso8601String();
-        salesOverTime[dateKey] = 0;
-        costOverTime[dateKey] = 0;
-      } else {
-        // Group everything by day
-        for (final s in sales) {
-          final dateKey = DateTime(s.date.year, s.date.month, s.date.day).toIso8601String();
-          salesOverTime[dateKey] = (salesOverTime[dateKey] ?? 0) + s.dailyRevenue;
-          costOverTime[dateKey] = (costOverTime[dateKey] ?? 0) + (s.dailyRevenue - s.estimatedProfit);
+      for (final dayObj in trendData) {
+        if (dayObj is Map<String, dynamic>) {
+          final dateStr = dayObj['day'].toString();
+          final rev = _toDouble(dayObj['revenue']);
+          final prof = _toDouble(dayObj['profit']);
+          salesOverTime[dateStr] = rev;
+          costOverTime[dateStr] = math.max(0.0, rev - prof);
         }
       }
 
+      // Metadata calculation logic derived from full sales list
+      final Map<String, double> categorySales = {};
+      final Map<String, Map<String, int>> soldVsStock = {};
+      
+      // We process allProducts but only for auxiliary data.
+      // Category sales and Sold vs Stock.
+      for (final s in sales) {
+        categorySales[s.category] = (categorySales[s.category] ?? 0) + s.dailyRevenue;
+        soldVsStock[s.productName] = {
+           'sold': s.quantity,
+           'stock': s.currentStock,
+        };
+      }
+
+      final sorted = List<Sale>.from(sales)..sort((a, b) => b.dailyRevenue.compareTo(a.dailyRevenue));
+      final lowProducts = sales.where((s) => s.currentStock < 5).toList()
+        ..sort((a, b) => a.currentStock.compareTo(b.currentStock));
+
       _cachedSummary = DashboardSummary(
-        totalSales: totalSales > 0 ? totalSales : _sumField(sales, (s) => s.dailyRevenue),
-        totalCost: (totalSales - totalProfit).abs(),
-        estimatedProfit: totalProfit > 0 ? totalProfit : _sumField(sales, (s) => s.estimatedProfit),
-        unitsSold: unitsSold > 0 ? unitsSold : sales.fold(0, (sum, s) => sum + s.quantity),
+        totalSales: totalSales,
+        totalCost: math.max(0.0, totalSales - totalProfit),
+        estimatedProfit: totalProfit,
+        unitsSold: unitsSold,
         categorySales: categorySales,
-        topProducts: topProducts,
+        topProducts: sorted.take(10).toList(),
         lowProducts: lowProducts,
         allProducts: sorted,
-        lowStockCount: computedLowStock,
-        salesTrendUp: dailyProfit >= 0,
+        lowStockCount: lowStockCount,
+        salesTrendUp: true, // simplified
         salesOverTime: salesOverTime,
         costOverTime: costOverTime,
         soldVsStock: soldVsStock,
@@ -261,14 +217,17 @@ class ApiSalesRepository implements SalesRepository {
 
   @override
   Future<Map<String, String>?> getAiInsight() async {
+    if (_cachedAiInsight != null) return _cachedAiInsight!;
+
     try {
       final data = await _api.get('/ai/insights');
       if (data is Map<String, dynamic> && data['insight'] != null) {
-        return {
+        _cachedAiInsight = {
           'insight': data['insight'].toString(),
           'reason': data['reason']?.toString() ?? 'Based on your recent sales patterns.',
           'action': data['action']?.toString() ?? 'Review your product mix and pricing.',
         };
+        return _cachedAiInsight;
       }
       return null;
     } catch (_) {

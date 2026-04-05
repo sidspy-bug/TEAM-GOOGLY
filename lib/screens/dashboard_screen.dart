@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../repositories/sales_repository.dart';
+import '../repositories/api_sales_repository.dart';
 import '../models/dashboard_summary.dart';
 import '../widgets/summary_card.dart';
 import '../widgets/line_chart_card.dart';
@@ -50,6 +51,10 @@ class DashboardScreenState extends State<DashboardScreen> {
   /// Public method to trigger a data refresh from parent shell
   void refresh() {
     if (mounted) {
+      // Clear repository cache before refreshing data
+      if (widget.salesRepository is ApiSalesRepository) {
+        (widget.salesRepository as ApiSalesRepository).clearCache();
+      }
       setState(() {
         _summaryFuture = widget.salesRepository.getDashboardSummary();
       });

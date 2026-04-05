@@ -333,16 +333,16 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             children: [
               // Summary card
               Card(
-                color: isDark ? const Color(0xFF1E293B) : Colors.amber.shade50,
+                color: isDark ? const Color(0xFF1E293B) : Colors.indigo.shade50,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
-                      Icon(Icons.shopping_cart, color: Colors.amber.shade700, size: 22),
+                      Icon(Icons.shopping_cart, color: Colors.indigo.shade400, size: 22),
                       const SizedBox(width: 12),
                       Text(
                         'Total Purchase Value: ₹${totalInventoryCost.toStringAsFixed(0)}',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.amber.shade200 : Colors.amber.shade800),
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.indigo.shade200 : Colors.indigo.shade800),
                       ),
                       const SizedBox(width: 24),
                       Text(
@@ -367,14 +367,14 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : Colors.amber.shade50,
+                        color: isDark ? const Color(0xFF1E293B) : Colors.indigo.shade50,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_today, size: 16, color: Colors.amber.shade600),
+                          Icon(Icons.calendar_today, size: 16, color: Colors.indigo.shade600),
                           const SizedBox(width: 8),
-                          Text(dateLabel, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.amber.shade200 : Colors.amber.shade700)),
+                          Text(dateLabel, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.indigo.shade200 : Colors.indigo.shade700)),
                           const Spacer(),
                           Text('Expended: ₹${dayCost.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade700)),
                         ],

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../repositories/sales_repository.dart';
 
-class AiInsightsCard extends StatelessWidget {
+class AiInsightsCard extends StatefulWidget {
   final bool isPremium;
   final int lowStockCount;
   final String topProduct;
@@ -18,8 +18,46 @@ class AiInsightsCard extends StatelessWidget {
   });
 
   @override
+  State<AiInsightsCard> createState() => _AiInsightsCardState();
+}
+
+class _AiInsightsCardState extends State<AiInsightsCard> {
+  // Key used to rebuild the FutureBuilder on manual refresh
+  Key _futureKey = UniqueKey();
+  bool _isRefreshing = false;
+
+  void _refresh() async {
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    // Clear the AI insight cache so we get a fresh response
+    (widget.salesRepository as dynamic).clearCache?.call();
+
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (mounted) {
+      setState(() {
+        _futureKey = UniqueKey();
+        _isRefreshing = false;
+      });
+    }
+  }
+
+  /// Strips Markdown symbols from a single line so the card stays clean.
+  String _cleanLine(String line) {
+    return line
+        .replaceAll(RegExp(r'^#+\s*'), '')        // ### headings
+        .replaceAll(RegExp(r'\*\*(.+?)\*\*'), r'$1') // **bold**
+        .replaceAll(RegExp(r'\*(.+?)\*'), r'$1')     // *italic*
+        .replaceAll(RegExp(r'^[-*•]\s+'), '')     // leading bullet
+        .replaceAll(r'$', '₹')                   // stray dollar signs
+        .trim();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (isPremium) {
+    if (widget.isPremium) {
       return _buildPremiumInsights(context);
     }
     return _buildFreeInsights(context);
@@ -42,10 +80,28 @@ class AiInsightsCard extends StatelessWidget {
                 Icon(Icons.auto_awesome, color: Colors.indigo.shade400, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  'AI Insights',
+                  'AI Business Assistant',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
                 ),
                 const Spacer(),
+                // ── Refresh Button ──────────────────────────────────
+                _isRefreshing
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.indigo.shade400,
+                        ),
+                      )
+                    : IconButton(
+                        icon: Icon(Icons.refresh_rounded, size: 20, color: Colors.indigo.shade400),
+                        tooltip: 'Refresh insights',
+                        onPressed: _refresh,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
@@ -63,32 +119,11 @@ class AiInsightsCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            _insightRow(
-              Icons.warning_amber_rounded,
-              Colors.red.shade400,
-              lowStockCount > 0
-                  ? '⚠️ $lowStockCount products are below the low-stock threshold. Consider restocking soon to avoid stockouts.'
-                  : '✅ All products are well-stocked. No restocking needed right now.',
-              isDark,
-            ),
-            const SizedBox(height: 10),
-            _insightRow(
-              Icons.emoji_events,
-              Colors.amber.shade600,
-              '🏆 Top selling product today: $topProduct. Consider bundling it with slower movers for higher ticket value.',
-              isDark,
-            ),
-            const SizedBox(height: 10),
-            _insightRow(
-              Icons.trending_up,
-              Colors.green.shade400,
-              '💰 Estimated profit: ₹${estimatedProfit.toStringAsFixed(0)}. Maintain margins by reviewing cost prices regularly.',
-              isDark,
-            ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
+            // Use _futureKey to force a fresh call on refresh
             FutureBuilder<Map<String, String>?>(
-              future: salesRepository.getAiInsight(),
+              key: _futureKey,
+              future: widget.salesRepository.getAiInsight(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(
@@ -97,34 +132,46 @@ class AiInsightsCard extends StatelessWidget {
                   );
                 }
                 if (snapshot.data == null || snapshot.data!['insight'] == null) {
-                  return const SizedBox.shrink();
+                  return Text(
+                    'Recording more sales (₹) will help the AI provide deeper insights.',
+                    style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 13),
+                  );
                 }
-                
-                final fullInsight = snapshot.data!['insight']!;
-                
-                // Parse structured layout:
-                String problem = '', opportunity = '', action = '';
-                
-                final RegExp emojiClearer = RegExp(r'[🔴🟢💡⚠️📉📈🏆💰🚨✅]');
 
-                if (fullInsight.contains('🔴') || fullInsight.contains('🟢')) {
-                   final splits = fullInsight.split(RegExp(r'(?=🔴|🟢|💡)'));
-                   for (var s in splits) {
-                     if (s.startsWith('🔴')) problem = s.replaceFirst(RegExp(r'🔴\s*Problem:?'), '').replaceAll(emojiClearer, '').trim();
-                     if (s.startsWith('🟢')) opportunity = s.replaceFirst(RegExp(r'🟢\s*Opportunity:?'), '').replaceAll(emojiClearer, '').trim();
-                     if (s.startsWith('💡')) action = s.replaceFirst(RegExp(r'💡\s*Action:?'), '').replaceAll(emojiClearer, '').trim();
-                   }
-                } else {
-                   problem = fullInsight.replaceAll(emojiClearer, '').trim(); // Fallback if unstructured
-                }
+                final fullInsight = snapshot.data!['insight']!;
+
+                // Parse lines, strip markdown, skip empty
+                final lines = fullInsight
+                    .split('\n')
+                    .map(_cleanLine)
+                    .where((l) => l.isNotEmpty)
+                    .toList();
 
                 return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (problem.isNotEmpty) _buildInsightBlock('🔴 Problem', problem, Colors.red.shade400, isDark),
-                    if (opportunity.isNotEmpty) _buildInsightBlock('🟢 Opportunity', opportunity, Colors.green.shade400, isDark),
-                    if (action.isNotEmpty) _buildInsightBlock('💡 Action', action, Colors.blue.shade400, isDark),
-                  ],
+                  children: lines.map((line) {
+                    IconData icon = Icons.info_outline;
+                    Color color = Colors.indigo;
+
+                    final lower = line.toLowerCase();
+                    if (lower.contains('performance')) {
+                      icon = Icons.trending_up;
+                      color = Colors.green.shade400;
+                    } else if (lower.contains('inventory')) {
+                      icon = Icons.inventory_2_outlined;
+                      color = Colors.orange.shade400;
+                    } else if (lower.contains('forecast') || lower.contains('weekly') || lower.contains('expect')) {
+                      icon = Icons.auto_graph;
+                      color = Colors.purple.shade400;
+                    } else if (lower.contains('recommend') || lower.contains('future')) {
+                      icon = Icons.lightbulb_outline;
+                      color = Colors.blue.shade400;
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _insightRow(icon, color, line, isDark),
+                    );
+                  }).toList(),
                 );
               },
             ),
@@ -169,16 +216,7 @@ class AiInsightsCard extends StatelessWidget {
             _insightRow(
               Icons.warning_amber_rounded,
               Colors.red.shade400,
-              lowStockCount > 0
-                  ? '⚠️ $lowStockCount products are low on stock.'
-                  : '✅ All products are well-stocked.',
-              isDark,
-            ),
-            const SizedBox(height: 10),
-            _insightRow(
-              Icons.emoji_events,
-              Colors.amber.shade600,
-              '🏆 Top seller: $topProduct',
+              'Inventory data is limited for free users.',
               isDark,
             ),
             const SizedBox(height: 10),
@@ -208,48 +246,25 @@ class AiInsightsCard extends StatelessWidget {
     );
   }
 
-  Widget _buildInsightBlock(String title, String content, Color accentColor, bool isDark) {
-    if (content.isEmpty) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : accentColor.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentColor.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: accentColor,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            content,
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.4,
-              color: isDark ? Colors.white70 : Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _insightRow(IconData icon, Color color, String text, bool isDark) {
+  Widget _insightRow(IconData? icon, Color color, String text, bool isDark) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 10),
-        Expanded(child: Text(text, style: TextStyle(fontSize: 13, height: 1.4, color: isDark ? Colors.white : Colors.black87))),
+        if (icon != null) ...[
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+        ],
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: isDark ? Colors.white : Colors.black87,
+              fontWeight: text.contains(':') ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
       ],
     );
   }

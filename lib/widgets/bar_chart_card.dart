@@ -42,10 +42,28 @@ class BarChartCard extends StatelessWidget {
         groups.add(
           BarChartGroupData(
             x: i,
-            barsSpace: 3,
+            barsSpace: 4,
             barRods: [
-              BarChartRodData(toY: sold, color: Colors.blue, width: 14, borderRadius: const BorderRadius.vertical(top: Radius.circular(3))),
-              BarChartRodData(toY: stock, color: Colors.orange, width: 14, borderRadius: const BorderRadius.vertical(top: Radius.circular(3))),
+              BarChartRodData(
+                toY: sold,
+                width: 16,
+                gradient: LinearGradient(
+                  colors: [Colors.cyan.shade300, Colors.cyan.shade700],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+              ),
+              BarChartRodData(
+                toY: stock,
+                width: 16,
+                gradient: LinearGradient(
+                  colors: [Colors.orange.shade300, Colors.orange.shade700],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+              ),
             ],
           ),
         );
@@ -65,11 +83,13 @@ class BarChartCard extends StatelessWidget {
             children: [
               Row(
                 children: [
+                   const Icon(Icons.bar_chart_rounded, color: Colors.indigo, size: 20),
+                   const SizedBox(width: 8),
                   const Text('Sold vs Stock', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const Spacer(),
-                  _legend(Colors.blue, 'Sold'),
+                  _legend(Colors.cyan.shade400, 'Sold'),
                   const SizedBox(width: 12),
-                  _legend(Colors.orange, 'Stock'),
+                  _legend(Colors.orange.shade400, 'Stock'),
                 ],
               ),
               const SizedBox(height: 16),
@@ -114,8 +134,21 @@ class BarChartCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: interval),
-                        borderData: FlBorderData(show: true, border: const Border(left: BorderSide(), bottom: BorderSide())),
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          horizontalInterval: interval,
+                          getDrawingHorizontalLine: (value) => FlLine(
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.black12,
+                            strokeWidth: 1,
+                          ),
+                        ),
+                        borderData: FlBorderData(
+                          show: true,
+                          border: Border(
+                             bottom: BorderSide(color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : Colors.black12),
+                          ),
+                        ),
                       ),
                     ),
                   ),

@@ -313,7 +313,7 @@ app.get("/transactions/history", verifyToken, (req, res) => {
     JOIN products p ON p.id = t.product_id
     WHERE t.user_id = ?
     ORDER BY t.transaction_date DESC
-    LIMIT 100
+    LIMIT 500
   `).all(req.user.uid);
 
   res.json(rows);
@@ -414,7 +414,20 @@ app.get("/analytics/summary", verifyToken, (req, res) => {
   });
 });
 
-// 📈 Weekly chart data (last 7 days)
+app.get("/analytics/overall-trend", verifyToken, (req, res) => {
+  const rows = db.prepare(`
+    SELECT date(transaction_date) AS day,
+           COALESCE(SUM(revenue), 0) AS revenue,
+           COALESCE(SUM(profit), 0) AS profit
+    FROM transactions
+    WHERE user_id = ? AND transaction_date >= datetime('now', '-90 days')
+    GROUP BY date(transaction_date)
+    ORDER BY day
+  `).all(req.user.uid);
+  res.json(rows);
+});
+
+// 📈 Weekly chart data (last 7 days — legacy but kept for compatibility)
 app.get("/analytics/weekly-chart", verifyToken, (req, res) => {
   const rows = db.prepare(`
     SELECT date(transaction_date) AS day,
@@ -432,27 +445,110 @@ app.get("/analytics/weekly-chart", verifyToken, (req, res) => {
    AI INSIGHT (Rule-based MVP)
 ===================== */
 
-app.get("/ai/insights", verifyToken, (req, res) => {
-  const uid = req.user.uid;
+// Helper: strip markdown from AI response lines
+function cleanMarkdownLine(line) {
+  return line
+    .replace(/^#+\s*/g, '')          // ### headings
+    .replace(/\*\*(.+?)\*\*/g, '$1') // **bold**
+    .replace(/\*(.+?)\*/g, '$1')     // *italic*
+    .replace(/^[-*•]\s+/, '')        // leading bullet dash
+    .replace(/\$/g, '₹')            // dollar to rupee
+    .trim();
+}
 
-  const topProduct = db.prepare(`
-    SELECT p.product_name FROM transactions t JOIN products p ON p.id = t.product_id
-    WHERE t.user_id = ? GROUP BY t.product_id ORDER BY SUM(t.revenue) DESC LIMIT 1
-  `).get(uid);
+// Helper: common AI insight logic used by GET and POST routes
+async function generateAiInsight(uid) {
+  const context = getShopContext(uid);
+  const validProducts = context.productsData.filter(p => p.costPrice != null && p.sellingPrice != null);
 
-  const lowStockCount = db.prepare(
-    "SELECT COUNT(*) AS count FROM inventory WHERE user_id = ? AND current_stock < ?"
-  ).get(uid, LOW_STOCK_THRESHOLD);
+  const weeklyForecast = context.estimatedWeeklyProfit.toFixed(0);
+  const dailyAvgProfit = context.dailyAverageProfit.toFixed(0);
+  const dailyAvgSales  = context.dailyAverageSales.toFixed(1);
 
-  let insight = "Your sales are stable. Consider increasing stock of high-selling products.";
-  if (topProduct) {
-    insight = `"${topProduct.product_name}" is your top seller. `;
+  const shopDataJson = JSON.stringify({
+    totalProfit: context.totalProfit,
+    totalSales: context.totalUnitsSold,
+    dailyAverageProfit: context.dailyAverageProfit,
+    dailyAverageSales: context.dailyAverageSales,
+    estimatedWeeklyProfit: context.estimatedWeeklyProfit,
+    products: validProducts.map(p => ({
+      name: p.name,
+      profitPerUnit: p.profitPerUnit,
+      quantitySold: p.quantitySold
+    }))
+  }, null, 2);
+
+  const assistantPrompt = `You are a professional business assistant for a small Indian shopkeeper.
+Analyze the shop data below and give a 3-part business report.
+
+RULES (follow strictly):
+- Language: Simple English, shopkeeper-friendly, no jargon.
+- Currency: Always ₹ (Indian Rupee). Never use $.
+- Format: Plain text only. No markdown, no bullet points, no hashtags, no bold symbols.
+- Structure: Always 3 labelled lines:
+  Performance Summary: <one sentence on sales and profit trend>
+  Inventory Insight: <one sentence on stock or product movement>
+  Weekly Forecast: Based on daily average profit of ₹${dailyAvgProfit} and ${dailyAvgSales} units/day, you can expect ₹${weeklyForecast} profit next week.
+- Max 1 sentence per section. Use real numbers from the data.
+- Do not hallucinate, do not add sections beyond these 3.
+
+DATA:
+${shopDataJson}`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 18000);
+
+    const ollamaResponse = await fetch(`${OLLAMA_URL}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        prompt: assistantPrompt,
+        stream: false,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (ollamaResponse.ok) {
+      const data = await ollamaResponse.json();
+      let reply = data.response || '';
+
+      // Strip all markdown symbols and emojis line by line
+      const cleaned = reply
+        .split('\n')
+        .map(l => cleanMarkdownLine(l))
+        .filter(l => l.length > 0)
+        .slice(0, 6) // cap at 6 meaningful lines
+        .join('\n');
+
+      if (cleaned.trim()) {
+        return {
+          insight: cleaned.trim(),
+          source: 'assistant'
+        };
+      }
+    }
+  } catch (err) {
+    console.warn(`Assistant call failed: ${err.message}`);
   }
-  if (lowStockCount.count > 0) {
-    insight += `⚠️ ${lowStockCount.count} product(s) are running low on stock.`;
-  }
 
-  res.json({ insight });
+  // Deterministic fallback using computed forecasting values
+  const top = validProducts.sort((a, b) => b.quantitySold - a.quantitySold)[0];
+  return {
+    insight: top
+      ? `Performance Summary: ${top.name} leads with ${top.quantitySold} units sold.\nInventory Insight: Monitor low stock items to avoid missed sales.\nWeekly Forecast: Based on daily average of ₹${dailyAvgProfit}/day, expect ₹${weeklyForecast} profit next week.`
+      : `Performance Summary: Business activity is steady.\nInventory Insight: Keep recording sales to unlock deeper insights.\nWeekly Forecast: Add more sales data for an accurate forecast.`,
+    source: 'fallback'
+  };
+}
+
+// GET /ai/insights — Merged with modern assistant logic
+app.get("/ai/insights", verifyToken, async (req, res) => {
+  const result = await generateAiInsight(req.user.uid);
+  res.json(result);
 });
 
 /* =====================
@@ -461,12 +557,42 @@ app.get("/ai/insights", verifyToken, (req, res) => {
 
 // Helper: gather shop context for AI
 function getShopContext(uid) {
-  const topProducts = db.prepare(`
-    SELECT p.product_name, SUM(t.units_sold) AS totalSold, SUM(t.revenue) AS totalRevenue
-    FROM transactions t JOIN products p ON p.id = t.product_id
-    WHERE t.user_id = ?
-    GROUP BY t.product_id ORDER BY totalRevenue DESC LIMIT 5
-  `).all(uid);
+  const products = db.prepare("SELECT id, product_name FROM products WHERE user_id = ?").all(uid);
+  
+  const productsData = products.map(p => {
+    // Latest costPrice from purchase history
+    const latestPurchase = db.prepare(`
+      SELECT cost_price FROM purchases 
+      WHERE user_id = ? AND product_id = ? 
+      ORDER BY purchase_date DESC LIMIT 1
+    `).get(uid, p.id);
+
+    // Latest sellingPrice from sales history (revenue / units)
+    const latestSale = db.prepare(`
+      SELECT (revenue / units_sold) as sellingPrice FROM transactions 
+      WHERE user_id = ? AND product_id = ? 
+      ORDER BY transaction_date DESC LIMIT 1
+    `).get(uid, p.id);
+
+    // Total quantity sold
+    const stats = db.prepare(`
+      SELECT SUM(units_sold) as quantitySold FROM transactions 
+      WHERE user_id = ? AND product_id = ?
+    `).get(uid, p.id);
+
+    const costPrice = latestPurchase ? latestPurchase.cost_price : null;
+    const sellingPrice = latestSale ? latestSale.sellingPrice : null;
+    const quantitySold = stats ? (stats.quantitySold || 0) : 0;
+    const profitPerUnit = (costPrice && sellingPrice) ? (sellingPrice - costPrice) : null;
+
+    return {
+      name: p.product_name,
+      costPrice,
+      sellingPrice,
+      quantitySold,
+      profitPerUnit
+    };
+  });
 
   const lowStock = db.prepare(`
     SELECT p.product_name, i.current_stock
@@ -481,14 +607,21 @@ function getShopContext(uid) {
     FROM transactions WHERE user_id = ?
   `).get(uid);
 
-  const productCount = db.prepare("SELECT COUNT(*) AS count FROM products WHERE user_id = ?").get(uid);
+  // Daily averages for forecasting
+  const firstTx = db.prepare("SELECT MIN(transaction_date) as firstDate FROM transactions WHERE user_id = ?").get(uid);
+  const totalDays = firstTx.firstDate ? Math.max(1, Math.ceil((new Date() - new Date(firstTx.firstDate)) / (1000 * 60 * 60 * 24))) : 1;
+  const dailyAverageProfit = totals.totalProfit / totalDays;
+  const dailyAverageSales = totals.totalUnitsSold / totalDays;
+  const estimatedWeeklyProfit = dailyAverageProfit * 7;
 
   return {
     totalRevenue: totals.totalRevenue,
     totalProfit: totals.totalProfit,
     totalUnitsSold: totals.totalUnitsSold,
-    totalProducts: productCount.count,
-    topProducts: topProducts.map(p => `${p.product_name} (sold: ${p.totalSold}, revenue: ₹${p.totalRevenue})`),
+    dailyAverageProfit,
+    dailyAverageSales,
+    estimatedWeeklyProfit,
+    productsData,
     lowStockItems: lowStock.map(p => `${p.product_name} (stock: ${p.current_stock})`),
   };
 }
@@ -522,7 +655,7 @@ function getRuleBasedResponse(message, context) {
   return `You have ${context.totalProducts} products, total revenue of ₹${context.totalRevenue.toFixed(0)}, and profit of ₹${context.totalProfit.toFixed(0)}. ${context.lowStockItems.length > 0 ? `⚠️ ${context.lowStockItems.length} items are low on stock.` : '✅ All stock levels are healthy.'} Ask me about sales, profit, stock, or suggestions!`;
 }
 
-// POST /ai/chat — Ollama-powered chat with fallback
+// POST /ai/chat — Ollama-powered chat with intent handling and cleaning
 app.post("/ai/chat", verifyToken, async (req, res) => {
   const uid = req.user.uid;
   const { message, history } = req.body;
@@ -532,152 +665,104 @@ app.post("/ai/chat", verifyToken, async (req, res) => {
   }
 
   const context = getShopContext(uid);
+  const q = message.toLowerCase();
 
-  // Format history
+  // --- Intent-Based Response Handling (Bypassing AI) ---
+
+  // Check valid products first
+  const validProducts = context.productsData.filter(p => p.costPrice != null && p.sellingPrice != null);
+  
+  if (q.includes("margin") || q.includes("profit per unit")) {
+    if (validProducts.length === 0) return res.json({ reply: "Not enough data available yet." });
+    
+    // Sort logic for "top" margin
+    if (q.includes("top")) {
+      const top5 = [...validProducts]
+        .sort((a, b) => b.profitPerUnit - a.profitPerUnit)
+        .slice(0, 5);
+      const items = top5.map(p => `${p.name}: ₹${p.profitPerUnit.toFixed(0)} profit per item`).join(", ");
+      return res.json({ reply: `Your top 5 margin items are: ${items}.` });
+    }
+  }
+
+  if (q.includes("not selling") || q.includes("lowest sales")) {
+    const bottom5 = [...context.productsData]
+      .sort((a, b) => a.quantitySold - b.quantitySold)
+      .slice(0, 5);
+    const items = bottom5.map(p => `${p.name} (${p.quantitySold} sold)`).join(", ");
+    return res.json({ reply: `Items with lowest sales: ${items}.` });
+  }
+
+  if (q.includes("top product") || q.includes("highest sales")) {
+    const top = [...context.productsData].sort((a, b) => b.quantitySold - a.quantitySold)[0];
+    if (top) return res.json({ reply: `Your top product by sales volume is ${top.name} with ${top.quantitySold} units sold.` });
+  }
+
+  // New: Highest Total Profit intent
+  if (q.includes("highest profit") || q.includes("most profitable")) {
+    const sortedByTotalProfit = [...context.productsData].sort((a, b) => 
+      (b.quantitySold * b.profitPerUnit) - (a.quantitySold * a.profitPerUnit)
+    );
+    const top = sortedByTotalProfit[0];
+    if (top) {
+      const totalProfit = top.quantitySold * top.profitPerUnit;
+      return res.json({ 
+        reply: `The most profitable product is ${top.name}, generating a total profit of ₹${totalProfit.toFixed(0)} from ${top.quantitySold} sales.` 
+      });
+    }
+  }
+
+  // --- AI Context & Prompt Handling ---
+
+  const constraints = {
+    excludeRevenue: q.includes("no revenue") || q.includes("exclude revenue"),
+    shortOnly: true
+  };
+
+  const shopDataJson = JSON.stringify({
+    totalProfit: context.totalProfit,
+    totalSales: context.totalUnitsSold,
+    products: validProducts.map(p => ({
+      name: p.name,
+      costPrice: p.costPrice,
+      sellingPrice: p.sellingPrice,
+      profitPerUnit: p.profitPerUnit,
+      quantitySold: p.quantitySold
+    }))
+  }, null, 2);
+
   const historyText = Array.isArray(history) && history.length > 0 
     ? `\nChat History:\n${history.join('\n')}\n`
     : '';
 
-  // Try Ollama first
+  const assistantPrompt = `You are a professional business advisor for a shopkeeper.
+Analyze the shop data and help them make better business decisions.
+
+* Tone: Professional, Strategic, and Simple shopkeeper style.
+* Currency: Always use Indian Rupee (₹).
+* Response Style: Be direct. Answer the specific question first, then provide 1-2 strategic tips.
+* Data Integrity:
+  - Focus on "Total Profit" (Quantity * Profit per Unit).
+  - Use the provided product list to identify specific items.
+  - Never hallucinate data. If you don't have the answer, ask for more details.
+
+DATA:
+${shopDataJson}
+
+USER QUESTION:
+${message}
+${historyText}`;
+
   try {
-    const shopDataPrompt = `You are an expert retail business advisor for small shopkeepers.
-
-Your role is to analyze shop data and answer business questions in a practical, profit-focused way.
-
-You must support TWO MODES:
-
-----------------------------------------
-MODE 1: AUTO INSIGHTS (no user question)
-----------------------------------------
-
-If no user question is provided, generate structured business insights.
-
-STRICT OUTPUT FORMAT:
-
-🔴 Problem:
-Identify one critical issue hurting the business (use specific product names, stock levels, or sales data).
-
-🟢 Opportunity:
-Identify one clear opportunity to increase revenue or profit (based on actual data trends).
-
-💡 Action:
-Give one clear, practical action the shopkeeper should take immediately.
-
-RULES:
-- Use real numbers and product names
-- Avoid generic advice
-- Keep it short and clear
-- Focus on profit, stock, and sales improvement
-
-----------------------------------------
-MODE 2: BUSINESS ASSISTANT (user question present)
-----------------------------------------
-
-If a user question is provided, answer it directly.
-
-RULES:
-- CRITICAL: NEVER hallucinate, invent, or create dummy data. 
-- You MUST securely and EXCLUSIVELY use the arrays and digits under the "DATA CONTEXT" below.
-- If the shop has "No sales yet" or "None", you must truthfully report that data doesn't exist yet instead of making up hypothetical metrics.
-- Be simple and practical (shopkeeper-friendly language)
-- Give actionable advice
-- Keep response concise (3–5 lines max)
-- Avoid technical or complex explanations
-
-----------------------------------------
-DATA CONTEXT:
-----------------------------------------
-
-Shop Data:
-- Total Revenue: ₹${context.totalRevenue.toFixed(0)}
-- Total Profit: ₹${context.totalProfit.toFixed(0)}
-- Total Units Sold: ${context.totalUnitsSold}
-- Total Products: ${context.totalProducts}
-- Top Products: ${context.topProducts.join(', ') || 'No sales yet'}
-- Low Stock Items: ${context.lowStockItems.join(', ') || 'None'}
-${historyText}
-----------------------------------------
-INPUT:
-----------------------------------------
-
-User Question:
-${message}`;
-
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+    const timeout = setTimeout(() => controller.abort(), 12000);
 
     const ollamaResponse = await fetch(`${OLLAMA_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: OLLAMA_MODEL,
-        prompt: shopDataPrompt,
-        stream: false,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    if (!ollamaResponse.ok) {
-      throw new Error(`Ollama returned ${ollamaResponse.status}`);
-    }
-
-    const data = await ollamaResponse.json();
-    const reply = data.response || data.message || '';
-
-    if (reply.trim()) {
-      console.log(`✅ Ollama (${OLLAMA_MODEL}) responded successfully`);
-      return res.json({ reply: reply.trim(), source: 'ollama' });
-    }
-
-    throw new Error('Empty Ollama response');
-  } catch (err) {
-    console.warn(`⚠️ Ollama unavailable (${err.message}), using rule-based fallback`);
-  }
-
-  // Fallback to rule-based
-  const fallbackReply = getRuleBasedResponse(message, context);
-  res.json({ reply: fallbackReply, source: 'rule-based' });
-});
-
-// POST /ai/insights — Ollama-powered insights with fallback
-app.post("/ai/insights", verifyToken, async (req, res) => {
-  const uid = req.user.uid;
-  const context = getShopContext(uid);
-
-  try {
-    const prompt = `Analyze this small Indian retail shop data and give exactly 3 actionable insights:
-- Total Revenue: ₹${context.totalRevenue.toFixed(0)}
-- Total Profit: ₹${context.totalProfit.toFixed(0)}
-- Top Products: ${context.topProducts.join(', ') || 'No sales yet'}
-- Low Stock Items: ${context.lowStockItems.join(', ') || 'None'}
-
-STRICT OUTPUT FORMAT:
-🔴 Problem:
-[identify one critical issue]
-
-🟢 Opportunity:
-[identify one clear opportunity to increase revenue or profit]
-
-💡 Action:
-[give one practical action]
-
-RULES:
-- Use real numbers and product names
-- Keep it short and clear
-- Focus on profit, stock, and sales improvement
-- Use ₹ for currency.`;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
-    const ollamaResponse = await fetch(`${OLLAMA_URL}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        prompt,
+        prompt: assistantPrompt,
         stream: false,
       }),
       signal: controller.signal,
@@ -687,27 +772,36 @@ RULES:
 
     if (ollamaResponse.ok) {
       const data = await ollamaResponse.json();
-      if (data.response && data.response.trim()) {
-        console.log(`✅ Ollama insights generated successfully`);
-        return res.json({ insight: data.response.trim(), source: 'ollama' });
+      let reply = data.response || '';
+      
+      // --- Response Cleaning: strip markdown + legacy labels ---
+      reply = reply.replace(/(Problem|Opportunity|Action):\s*/gi, '');
+      const lines = reply
+        .split('\n')
+        .map(l => cleanMarkdownLine(l))
+        .filter(l => l.trim().length > 0)
+        .slice(0, 4);
+      reply = lines.join('\n');
+
+      if (reply.trim()) {
+        return res.json({ reply: reply.trim(), source: 'assistant' });
       }
     }
-    throw new Error('Ollama unavailable');
   } catch (err) {
-    console.warn(`⚠️ Ollama insights fallback: ${err.message}`);
+    console.warn(`Assistant call failed: ${err.message}`);
   }
 
-  const fallbackInsight = `🔴 Problem:
-${context.lowStockItems.length > 0 ? context.lowStockItems[0] + ' is critically low on stock.' : 'No major problems detected, but sales volume could be optimized.'}
-
-🟢 Opportunity:
-${context.topProducts.length > 0 ? context.topProducts[0] + ' is your best seller, consider promoting it more or bundling it.' : 'Start bundles to increase average order value.'}
-
-💡 Action:
-Review your pricing and reorder fast-moving items immediately.`;
-
-  res.json({ insight: fallbackInsight, source: 'rule-based' });
+  // Edge case handle if AI fails
+  const fallback = getRuleBasedResponse(message, context);
+  res.json({ reply: fallback, source: 'fallback' });
 });
+
+// POST /ai/insights — Aligning with the same logic
+app.post("/ai/insights", verifyToken, async (req, res) => {
+  const result = await generateAiInsight(req.user.uid);
+  res.json(result);
+});
+
 
 /* =====================
    OCR MODULE

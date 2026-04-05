@@ -105,8 +105,9 @@ const seedEvents = db.transaction(() => {
     
     // 1. Restock Check: Buy Inventory if Low!
     for (let i = 0; i < products.length; i++) {
-       if (currentStocks[i] < 10) {
-          const refillQty = Math.floor(Math.random() * 50) + 30; // buy 30-80 units
+       // More aggressive restocking: if stock < 20 or 30% chance of random restock
+       if (currentStocks[i] < 20 || Math.random() < 0.05) {
+          const refillQty = Math.floor(Math.random() * 100) + 50; // buy 50-150 units
           const gst = (products[i].cost * 0.05).toFixed(2); // 5% GST example
           
           date.setHours(9); // 9am morning restocks
@@ -119,13 +120,14 @@ const seedEvents = db.transaction(() => {
        }
     }
 
-    // 2. Generate random sales (0 to 4 txns per day)
-    const txnsToday = Math.floor(Math.random() * 5); 
+    // 2. Generate random sales (1 to 8 txns per day for more activity)
+    const txnsToday = Math.floor(Math.random() * 8) + 1; 
     for (let i = 0; i < txnsToday; i++) {
       let pIdx = Math.floor(Math.random() * products.length);
-      if (Math.random() > 0.5) pIdx = Math.floor(Math.random() * 4); 
+      // Bias towards first few products (top sellers)
+      if (Math.random() > 0.4) pIdx = Math.floor(Math.random() * 5); 
       
-      const units = Math.floor(Math.random() * 3) + 1;
+      const units = Math.floor(Math.random() * 5) + 1;
       if (currentStocks[pIdx] >= units) {
          const product = products[pIdx];
          const mode = ["UPI", "Cash", "Card"][Math.floor(Math.random() * 3)];
