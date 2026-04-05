@@ -1,0 +1,27 @@
+name: ai_business_insights_mvp
+description: AI-Powered Business Insights App for Small Shop Owners (MVP)
+publish_to: 'none'
+version: 0.1.0
+environment:
+  sdk: '>=2.18.0 <3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  fl_chart: ^0.66.0
+  firebase_core: ^4.4.0
+  firebase_auth: ^6.1.4
+  firebase_analytics: ^12.1.2
+  http: ^1.6.0
+  shared_preferences: ^2.2.2
+  image_picker: ^1.0.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
