@@ -26,7 +26,8 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-const LOW_STOCK_THRESHOLD = 5;
+const axios = require("axios");
+const LOW_STOCK_THRESHOLD = 10;
 
 // Ollama config
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
@@ -255,6 +256,20 @@ app.get("/inventory/status", verifyToken, (req, res) => {
   res.json(stock);
 });
 
+// 📦 Inventory Check
+app.get("/inventory", verifyToken, (req, res) => {
+  const uid = req.user.uid;
+  const rows = db.prepare("SELECT product_id AS productId, current_stock AS currentStock FROM inventory WHERE user_id = ?").all(uid);
+  res.json(rows);
+});
+
+// 🏷 Products Listing
+app.get("/products", verifyToken, (req, res) => {
+  const uid = req.user.uid;
+  const rows = db.prepare("SELECT id, product_name AS productName, category, cost_price AS costPrice, selling_price AS sellingPrice FROM products WHERE user_id = ?").all(uid);
+  res.json(rows);
+});
+
 /* =====================
    TRANSACTIONS MODULE
 ===================== */
@@ -268,8 +283,8 @@ app.post("/transactions/sell", verifyToken, (req, res) => {
       return res.status(400).json({ error: "Invalid productId or unitsSold" });
     }
 
-    const product = db.prepare("SELECT * FROM products WHERE id = ?").get(productId);
-    const inventory = db.prepare("SELECT * FROM inventory WHERE product_id = ?").get(productId);
+    const product = db.prepare("SELECT id, product_name AS productName, category, cost_price AS costPrice, selling_price AS sellingPrice FROM products WHERE id = ?").get(productId);
+    const inventory = db.prepare("SELECT product_id AS productId, current_stock AS currentStock FROM inventory WHERE product_id = ?").get(productId);
 
     if (!product || !inventory) {
       return res.status(404).json({ error: "Product or inventory not found" });
@@ -328,27 +343,27 @@ app.get("/dashboard/summary", verifyToken, (req, res) => {
     FROM transactions WHERE user_id = ? AND date(transaction_date) = date('now')
   `).get(uid);
 
-  const total = db.prepare(`
+  const monthly = db.prepare(`
     SELECT COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(profit), 0) AS profit,
            COALESCE(SUM(units_sold), 0) AS unitsSold, COUNT(*) AS count
-    FROM transactions WHERE user_id = ?
+    FROM transactions WHERE user_id = ? AND strftime('%Y-%m', transaction_date) = strftime('%Y-%m', 'now')
   `).get(uid);
 
-  const lowStockCount = db.prepare(
+  const lowStockCountRes = db.prepare(
     "SELECT COUNT(*) AS count FROM inventory WHERE user_id = ? AND current_stock < ?"
   ).get(uid, LOW_STOCK_THRESHOLD);
-
-  const productCount = db.prepare("SELECT COUNT(*) AS count FROM products WHERE user_id = ?").get(uid);
+  const count = lowStockCountRes.count;
+  
+  console.log(`🔍 [DASHBOARD] Summary Request for ${uid}: lowStockCount=${count} (Threshold=${LOW_STOCK_THRESHOLD})`);
 
   res.json({
-    totalRevenue: total.revenue,
-    totalProfit: total.profit,
-    totalTransactions: total.count,
-    unitsSold: total.unitsSold,
+    totalRevenue: monthly.revenue,
+    totalProfit: monthly.profit,
+    totalTransactions: monthly.count,
+    unitsSold: monthly.unitsSold,
     dailyRevenue: today.revenue,
     dailyProfit: today.profit,
-    lowStockCount: lowStockCount.count,
-    totalProducts: productCount.count,
+    lowStockCount: count,
   });
 });
 
@@ -667,131 +682,57 @@ app.post("/ai/chat", verifyToken, async (req, res) => {
   const context = getShopContext(uid);
   const q = message.toLowerCase();
 
-  // --- Intent-Based Response Handling (Bypassing AI) ---
-
-  // Check valid products first
-  const validProducts = context.productsData.filter(p => p.costPrice != null && p.sellingPrice != null);
-  
-  if (q.includes("margin") || q.includes("profit per unit")) {
-    if (validProducts.length === 0) return res.json({ reply: "Not enough data available yet." });
-    
-    // Sort logic for "top" margin
-    if (q.includes("top")) {
-      const top5 = [...validProducts]
-        .sort((a, b) => b.profitPerUnit - a.profitPerUnit)
-        .slice(0, 5);
-      const items = top5.map(p => `${p.name}: ₹${p.profitPerUnit.toFixed(0)} profit per item`).join(", ");
-      return res.json({ reply: `Your top 5 margin items are: ${items}.` });
-    }
+  // --- 1. Specific Data Intents (High Priority, Fast) ---
+  const mentionedProduct = context.productsData.find(p => q.includes(p.name.toLowerCase()));
+  if (mentionedProduct && (q.includes("restock") || q.includes("stock") || q.includes("how much") || q.includes("price"))) {
+    const stockStatus = mentionedProduct.currentStock < LOW_STOCK_THRESHOLD ? "⚠️ LOW" : "✅ Healthy";
+    return res.json({ 
+      reply: `For ${mentionedProduct.name}: Current stock is ${mentionedProduct.currentStock} units (${stockStatus}). Prices: Cost ₹${mentionedProduct.costPrice}, Selling ₹${mentionedProduct.sellingPrice}.`,
+      source: 'intent'
+    });
   }
 
-  if (q.includes("not selling") || q.includes("lowest sales")) {
-    const bottom5 = [...context.productsData]
-      .sort((a, b) => a.quantitySold - b.quantitySold)
-      .slice(0, 5);
-    const items = bottom5.map(p => `${p.name} (${p.quantitySold} sold)`).join(", ");
-    return res.json({ reply: `Items with lowest sales: ${items}.` });
-  }
-
-  if (q.includes("top product") || q.includes("highest sales")) {
-    const top = [...context.productsData].sort((a, b) => b.quantitySold - a.quantitySold)[0];
-    if (top) return res.json({ reply: `Your top product by sales volume is ${top.name} with ${top.quantitySold} units sold.` });
-  }
-
-  // New: Highest Total Profit intent
-  if (q.includes("highest profit") || q.includes("most profitable")) {
-    const sortedByTotalProfit = [...context.productsData].sort((a, b) => 
-      (b.quantitySold * b.profitPerUnit) - (a.quantitySold * a.profitPerUnit)
-    );
-    const top = sortedByTotalProfit[0];
-    if (top) {
-      const totalProfit = top.quantitySold * top.profitPerUnit;
-      return res.json({ 
-        reply: `The most profitable product is ${top.name}, generating a total profit of ₹${totalProfit.toFixed(0)} from ${top.quantitySold} sales.` 
-      });
-    }
-  }
-
-  // --- AI Context & Prompt Handling ---
-
-  const constraints = {
-    excludeRevenue: q.includes("no revenue") || q.includes("exclude revenue"),
-    shortOnly: true
+  // --- 2. Real AI Intelligence (Ollama Primary) ---
+  const shopDataSummary = {
+    totalProfit: context.totalProfit,
+    totalRevenue: context.totalRevenue,
+    topItems: context.topProducts,
+    lowStock: context.lowStockItems
   };
 
-  const shopDataJson = JSON.stringify({
-    totalProfit: context.totalProfit,
-    totalSales: context.totalUnitsSold,
-    products: validProducts.map(p => ({
-      name: p.name,
-      costPrice: p.costPrice,
-      sellingPrice: p.sellingPrice,
-      profitPerUnit: p.profitPerUnit,
-      quantitySold: p.quantitySold
-    }))
-  }, null, 2);
-
-  const historyText = Array.isArray(history) && history.length > 0 
-    ? `\nChat History:\n${history.join('\n')}\n`
-    : '';
-
-  const assistantPrompt = `You are a professional business advisor for a shopkeeper.
-Analyze the shop data and help them make better business decisions.
-
-* Tone: Professional, Strategic, and Simple shopkeeper style.
-* Currency: Always use Indian Rupee (₹).
-* Response Style: Be direct. Answer the specific question first, then provide 1-2 strategic tips.
-* Data Integrity:
-  - Focus on "Total Profit" (Quantity * Profit per Unit).
-  - Use the provided product list to identify specific items.
-  - Never hallucinate data. If you don't have the answer, ask for more details.
-
-DATA:
-${shopDataJson}
-
-USER QUESTION:
-${message}
-${historyText}`;
+  const assistantPrompt = `You are GrowthOS Assistant, a retail expert. 
+Data: ${JSON.stringify(shopDataSummary)}. 
+User: "${message}". 
+Analyze the data and provide 2-3 professional, actionable business sentences for a shopkeeper. Use ₹.`;
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    // Sort products by profit margin directly in Node before sending to Ollama to ensure accuracy
+    const enrichedProducts = context.productsData
+      .filter(p => p.profitPerUnit !== null)
+      .sort((a, b) => b.profitPerUnit - a.profitPerUnit)
+      .slice(0, 10); // Top 10 most profitable
 
-    const ollamaResponse = await fetch(`${OLLAMA_URL}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        prompt: assistantPrompt,
-        stream: false,
-      }),
-      signal: controller.signal,
-    });
+    const assistantPrompt = `You are GrowthOS Assistant, a retail expert. 
+Data: ${JSON.stringify(shopDataSummary)}. 
+Top Profitable Products: ${JSON.stringify(enrichedProducts)}.
+User: "${message}". 
+Analyze the data and answer the user directly in a professional tone. MENTION EXACT RS PROFIT MARGINS. ALWAYS use the Indian Rupee symbol (₹) instead of $. Keep it under 3-4 sentences.`;
+    
+    console.log("SENDING TO AI:", assistantPrompt);
+    const aiResponse = await axios.post(`${OLLAMA_URL}/api/generate`, {
+      model: OLLAMA_MODEL,
+      prompt: assistantPrompt,
+      stream: false,
+    }, { timeout: 30000 });
 
-    clearTimeout(timeout);
-
-    if (ollamaResponse.ok) {
-      const data = await ollamaResponse.json();
-      let reply = data.response || '';
-      
-      // --- Response Cleaning: strip markdown + legacy labels ---
-      reply = reply.replace(/(Problem|Opportunity|Action):\s*/gi, '');
-      const lines = reply
-        .split('\n')
-        .map(l => cleanMarkdownLine(l))
-        .filter(l => l.trim().length > 0)
-        .slice(0, 4);
-      reply = lines.join('\n');
-
-      if (reply.trim()) {
-        return res.json({ reply: reply.trim(), source: 'assistant' });
-      }
+    if (aiResponse.data && aiResponse.data.response) {
+      return res.json({ reply: aiResponse.data.response.trim(), source: 'ollama' });
     }
   } catch (err) {
-    console.warn(`Assistant call failed: ${err.message}`);
+    console.error("AI Error (falling back):", err.message);
   }
 
-  // Edge case handle if AI fails
+  // --- 3. Rule-Based Fallback (Safety Net) ---
   const fallback = getRuleBasedResponse(message, context);
   res.json({ reply: fallback, source: 'fallback' });
 });

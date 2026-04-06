@@ -129,7 +129,8 @@ class ApiSalesRepository implements SalesRepository {
 
   @override
   Future<DashboardSummary> getDashboardSummary() async {
-    if (_cachedSummary != null) return _cachedSummary!;
+    // Force refresh to ensure Low Stock count (1 vs 2) is always accurate
+    // if (_cachedSummary != null) return _cachedSummary!;
 
     try {
       // Fetch dashboard summary and overall trend in parallel
@@ -142,6 +143,9 @@ class ApiSalesRepository implements SalesRepository {
       final summaryData = results[0] as Map<String, dynamic>;
       final trendData = results[1] as List<dynamic>;
       final sales = results[2] as List<Sale>;
+
+      print('🔍 [DEBUG] API summaryData: $summaryData');
+      print('🔍 [DEBUG] Sales list length: ${sales.length}');
 
       final totalSales = _toDouble(summaryData['totalRevenue'] ?? 0);
       final totalProfit = _toDouble(summaryData['totalProfit'] ?? 0);
@@ -176,8 +180,32 @@ class ApiSalesRepository implements SalesRepository {
         };
       }
 
-      final sorted = List<Sale>.from(sales)..sort((a, b) => b.dailyRevenue.compareTo(a.dailyRevenue));
-      final lowProducts = sales.where((s) => s.currentStock < 5).toList()
+      final Map<String, Sale> aggregated = {};
+      for (final s in sales) {
+        if (!aggregated.containsKey(s.productId)) {
+          aggregated[s.productId] = s;
+        } else {
+          final existing = aggregated[s.productId]!;
+          aggregated[s.productId] = Sale(
+            productId: s.productId,
+            productName: s.productName,
+            category: s.category,
+            quantity: existing.quantity + s.quantity,
+            price: s.price,
+            costPrice: s.costPrice,
+            currentStock: s.currentStock,
+            date: s.date,
+            transactionMode: s.transactionMode,
+          );
+        }
+      }
+
+      final sorted = aggregated.values.toList()..sort((a, b) => b.dailyRevenue.compareTo(a.dailyRevenue));
+      
+      final uniqueSales = <String, Sale>{};
+      for(final s in sales) { uniqueSales[s.productId] = s; }
+      
+      final lowProducts = uniqueSales.values.where((s) => s.currentStock < 10).toList()
         ..sort((a, b) => a.currentStock.compareTo(b.currentStock));
 
       _cachedSummary = DashboardSummary(
@@ -189,7 +217,7 @@ class ApiSalesRepository implements SalesRepository {
         topProducts: sorted.take(10).toList(),
         lowProducts: lowProducts,
         allProducts: sorted,
-        lowStockCount: lowStockCount,
+        lowStockCount: math.max(lowStockCount, lowProducts.length),
         salesTrendUp: true, // simplified
         salesOverTime: salesOverTime,
         costOverTime: costOverTime,

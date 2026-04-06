@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
@@ -11,9 +12,6 @@ class BarChartCard extends StatelessWidget {
     try {
       var entries = soldVsStock.entries.toList()
         ..sort((a, b) => (b.value['sold'] ?? 0).compareTo(a.value['sold'] ?? 0));
-      if (entries.length > 10) {
-        entries = entries.take(10).toList();
-      }
 
       if (entries.isEmpty) {
         return Card(
@@ -32,20 +30,26 @@ class BarChartCard extends StatelessWidget {
       }
 
       final groups = <BarChartGroupData>[];
-      double maxValue = 0;
+      double maxRaw = 0;
       for (var i = 0; i < entries.length; i++) {
         final e = entries[i];
-        final sold = (e.value['sold'] ?? 0).toDouble();
-        final stock = (e.value['stock'] ?? 0).toDouble();
-        if (sold > maxValue) maxValue = sold;
-        if (stock > maxValue) maxValue = stock;
+        final soldRaw = (e.value['sold'] ?? 0).toDouble();
+        final stockRaw = (e.value['stock'] ?? 0).toDouble();
+        
+        if (soldRaw > maxRaw) maxRaw = soldRaw;
+        if (stockRaw > maxRaw) maxRaw = stockRaw;
+
+        // Visual Normalization: sqrt() makes small bars visible and compares them better to large ones.
+        final soldVisual = math.sqrt(soldRaw);
+        final stockVisual = math.sqrt(stockRaw);
+
         groups.add(
           BarChartGroupData(
             x: i,
             barsSpace: 4,
             barRods: [
               BarChartRodData(
-                toY: sold,
+                toY: soldVisual,
                 width: 16,
                 gradient: LinearGradient(
                   colors: [Colors.cyan.shade300, Colors.cyan.shade700],
@@ -55,7 +59,7 @@ class BarChartCard extends StatelessWidget {
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
               ),
               BarChartRodData(
-                toY: stock,
+                toY: stockVisual,
                 width: 16,
                 gradient: LinearGradient(
                   colors: [Colors.orange.shade300, Colors.orange.shade700],
@@ -69,11 +73,9 @@ class BarChartCard extends StatelessWidget {
         );
       }
 
-      if (maxValue == 0) maxValue = 100;
-      final ceilMax = (maxValue * 1.2).ceilToDouble();
-      // Compute a nice interval: ~5 ticks
-      double interval = (ceilMax / 5).ceilToDouble();
-      if (interval < 1) interval = 1;
+      // Max scaled Y value
+      final maxVisual = math.sqrt(maxRaw > 0 ? maxRaw : 100);
+      final ceilMaxVisual = (maxVisual * 1.1);
 
       return Card(
         child: Padding(
@@ -101,7 +103,7 @@ class BarChartCard extends StatelessWidget {
                     width: entries.length * 60.0 + 40.0, // Fixed width per bar group
                     child: BarChart(
                       BarChartData(
-                        maxY: ceilMax,
+                        maxY: ceilMaxVisual,
                         minY: 0,
                         barGroups: groups,
                         titlesData: FlTitlesData(
@@ -126,10 +128,12 @@ class BarChartCard extends StatelessWidget {
                             sideTitles: SideTitles(
                               showTitles: true,
                               reservedSize: 42,
-                              interval: interval,
+                              interval: 5, // Visual interval (sqrt units)
                               getTitlesWidget: (v, meta) {
-                                if (v == meta.max) return const SizedBox.shrink();
-                                return Text(v.toInt().toString(), style: const TextStyle(fontSize: 10));
+                                if (v == 0) return const Text('0', style: TextStyle(fontSize: 10));
+                                // Show original number square (v*v)
+                                final original = math.pow(v, 2).round();
+                                return Text(original.toString(), style: const TextStyle(fontSize: 10));
                               },
                             ),
                           ),
@@ -137,7 +141,7 @@ class BarChartCard extends StatelessWidget {
                         gridData: FlGridData(
                           show: true,
                           drawVerticalLine: false,
-                          horizontalInterval: interval,
+                          horizontalInterval: 5,
                           getDrawingHorizontalLine: (value) => FlLine(
                             color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.black12,
                             strokeWidth: 1,

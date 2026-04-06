@@ -266,14 +266,14 @@ class DashboardScreenState extends State<DashboardScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cards = [
       SummaryCard(
-        title: 'Total Sales',
+        title: 'Total Sales (Month)',
         value: '₹${summary.totalSales.toStringAsFixed(0)}',
         icon: Icons.storefront,
         color: isDark ? Colors.blue.shade900.withValues(alpha: 0.3) : Colors.blue.shade50,
         onTap: () => _showCardDetails(0, summary),
       ),
       SummaryCard(
-        title: 'Estimated Profit',
+        title: 'Profit (Month)',
         value: '₹${summary.estimatedProfit.toStringAsFixed(0)}',
         icon: Icons.trending_up,
         color: isDark ? Colors.green.shade900.withValues(alpha: 0.3) : Colors.green.shade50,
@@ -287,7 +287,7 @@ class DashboardScreenState extends State<DashboardScreen> {
         onTap: () => _showCardDetails(2, summary),
       ),
       SummaryCard(
-        title: 'Units Sold',
+        title: 'Units Sold (Month)',
         value: '${summary.unitsSold}',
         icon: Icons.shopping_cart,
         color: isDark ? Colors.purple.shade900.withValues(alpha: 0.3) : Colors.purple.shade50,
