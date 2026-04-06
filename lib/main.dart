@@ -20,16 +20,29 @@ import 'widgets/floating_ai_assistant.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  // Initialize Firebase Analytics
-  FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
-  // Load persisted shop config
-  await ShopConfig.instance.load();
-  // Load persisted theme preference
-  await ThemeService.instance.load();
-  runApp(const MyApp());
+  
+  try {
+    // Fail-safe initialization: Timeout if Firebase or Config hangs
+    await Future.any([
+      Future.wait([
+        Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        ).then((_) {
+          // Initialize Firebase Analytics
+          FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
+        }),
+        ShopConfig.instance.load(),
+        ThemeService.instance.load(),
+      ]),
+      Future.delayed(const Duration(seconds: 5), () {
+        print('⚠️ [INITIALIZATION] Hang detected — proceeding to UI with partial state.');
+      }),
+    ]);
+  } catch (e) {
+    print('❌ [INITIALIZATION] Error occurred: $e');
+  } finally {
+    runApp(const MyApp());
+  }
 }
 
 class MyApp extends StatefulWidget {
