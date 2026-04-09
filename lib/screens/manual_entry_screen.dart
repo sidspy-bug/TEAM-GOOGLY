@@ -73,7 +73,8 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load products: $e';
+        final message = e is ApiException ? e.message : e.toString();
+        _error = 'Failed to load products: $message';
         _loadingProducts = false;
       });
     }
@@ -91,7 +92,8 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
         await _recordSale();
       }
     } catch (e) {
-      setState(() => _error = e.toString());
+      final message = e is ApiException ? e.message : e.toString();
+      setState(() => _error = message);
     } finally {
       setState(() => _isSaving = false);
     }

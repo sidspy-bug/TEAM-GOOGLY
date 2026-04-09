@@ -159,6 +159,13 @@ class ApiService {
       );
     }
 
+    if (failedFetch) {
+      return ApiException(
+        'Cannot connect to the server. Please make sure the backend is running.',
+        0,
+      );
+    }
+
     return ApiException('Network error: $msg', 0);
   }
 }
